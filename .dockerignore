@@ -1,0 +1,14 @@
+.git
+.github
+**/target
+**/node_modules
+**/dist
+**/.astro
+**/*.db
+**/*.db-*
+**/.env
+**/.env.*
+!**/.env.example
+tmp
+.cache
+**/.DS_Store

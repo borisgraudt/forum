@@ -1,17 +1,70 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCookieHeader, getMe, listCategories } from '../lib/api';
+import type { Category } from '../lib/types';
 
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+
+let categories: Category[] = [];
+let error: string | null = null;
+try {
+  categories = await listCategories(cookie);
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Could not load categories';
+}
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout title="Community" user={user}>
+  <section class="page-intro">
+    <h1>Community</h1>
+    <p>Find answers. Ask questions. Connect with others.</p>
+  </section>
+
+  {
+    error ? (
+      <div class="alert">{error}. Is the API running on port 3000?</div>
+    ) : (
+      <div class="panel">
+        <div class="panel__head">
+          <h2>Topics</h2>
+          {user && (
+            <a class="btn btn-secondary" href="/categories/new">
+              New topic
+            </a>
+          )}
+        </div>
+        {categories.length === 0 ? (
+          <div class="empty">
+            No topics yet.
+            {user ? (
+              <>
+                {' '}
+                <a href="/categories/new">Create the first one</a>.
+              </>
+            ) : (
+              <>
+                {' '}
+                <a href="/login">Sign in</a> to create one.
+              </>
+            )}
+          </div>
+        ) : (
+          <ul class="list">
+            {categories.map((cat) => (
+              <li class="list-item">
+                <a class="row" href={`/categories/${cat.slug}`}>
+                  <div class="row__main">
+                    <div class="row__title">{cat.name}</div>
+                    <div class="row__meta">{cat.description || 'Discussions and questions'}</div>
+                  </div>
+                  <div class="row__aside">View</div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+</BaseLayout>

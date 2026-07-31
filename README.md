@@ -40,35 +40,26 @@ Designed for niche communities that value speed, low resource usage, and strong 
 ## Project Structure
 
 ```text
-ultraforum/
+forum/
 ├── backend/                 # Rust + Axum API
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── config.rs
+│   │   ├── db.rs
 │   │   ├── error.rs
-│   │   ├── state.rs
-│   │   ├── db/
-│   │   ├── models/
-│   │   ├── dto/
-│   │   ├── handlers/
-│   │   ├── middleware/
-│   │   ├── services/
-│   │   └── utils/
+│   │   ├── models/          # users, categories, threads, posts
+│   │   └── state.rs
 │   ├── migrations/
 │   └── Cargo.toml
 │
 ├── frontend/                # Astro
 │   ├── src/
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── layouts/
-│   │   ├── lib/
-│   │   └── styles/
 │   └── package.json
 │
-├── shared/
+├── .github/workflows/ci.yml
 ├── docker-compose.yml
 ├── Makefile
+├── CONTRIBUTING.md
 └── README.md
 ```
 
@@ -119,13 +110,43 @@ npm run dev
 
 Frontend will be available at `http://localhost:4321`
 
+UI is a minimal community shell (Apple Discussions–inspired): topics, threads, posts, sign-in/join. Start the backend first so SSR can reach the API.
+
 ### 4. Development with Makefile (recommended)
 
 ```bash
-make dev          # starts both backend and frontend
-make migrate      # run migrations
+make setup        # deps + .env
+make migrate      # apply SQLx migrations
+make dev          # cargo-watch backend + Astro HMR
+make lint         # rustfmt + clippy + frontend lint
+make test         # backend tests
 make build        # production build
+make audit        # cargo audit + npm audit
 ```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for Git flow and PR rules.
+
+---
+
+## Workflows
+
+| Workflow | Command / place | Notes |
+|----------|-----------------|-------|
+| Local development | `make dev` | Backend `:3000`, frontend `:4321` |
+| Migrations | `make migrate` | SQLx + files in `backend/migrations/` |
+| Lint & format | `make lint` / `make fmt` | rustfmt, clippy `-D warnings`, Prettier, `astro check` |
+| Tests | `make test` | Unit + HTTP smoke tests on backend |
+| Package (tarball) | `make package` | Portable archive under `dist/` / Release **Assets** |
+| GitHub Packages | one package **`forum`** on GHCR | tags `backend-*` / `frontend-*` |
+| Docker | `make docker-up` | Compose profile `app` |
+| Git flow | `main` ← `develop` ← `feature/*` | Details in CONTRIBUTING |
+| CI | `.github/workflows/ci.yml` | fmt · clippy · test · frontend build · audit on every PR |
+| Release | tag `v*` → release workflow | Tarballs + GHCR + GitHub Release |
+| Security | `make audit` | `cargo audit` + `npm audit --audit-level=high` |
+
+See **[docs/DEPLOY.md](./docs/DEPLOY.md)** for production env, Docker, **GitHub Packages**, and pre-releases.
+
+**Current version:** `0.1.0-alpha.1`
 
 ---
 
@@ -138,9 +159,35 @@ HOST=0.0.0.0
 PORT=3000
 DATABASE_URL=sqlite:forum.db?mode=rwc
 JWT_SECRET=change-me-to-a-long-random-string
+JWT_TTL_SECS=604800
+COOKIE_SECURE=false
 RUST_LOG=info
 CORS_ORIGIN=http://localhost:4321
 ```
+
+### Auth API (`/api/v1/auth`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/register` | Create account, set `session` httpOnly cookie |
+| POST | `/login` | Login (username or email), set cookie |
+| POST | `/logout` | Clear session cookie |
+| GET | `/me` | Current user (requires cookie) |
+
+Cookie: `session` — httpOnly, SameSite=Lax, Secure when `COOKIE_SECURE=true`.
+
+### Forum API
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/categories` | no | List categories |
+| GET | `/api/v1/categories/{slug}` | no | Get category |
+| POST | `/api/v1/categories` | yes | Create category |
+| GET | `/api/v1/categories/{slug}/threads` | no | List threads (`limit`/`offset`) |
+| GET | `/api/v1/categories/{c}/threads/{t}` | no | Get thread |
+| POST | `/api/v1/categories/{slug}/threads` | yes | Create thread + first post |
+| GET | `/api/v1/categories/{c}/threads/{t}/posts` | no | List posts |
+| POST | `/api/v1/categories/{c}/threads/{t}/posts` | yes | Reply (403 if locked) |
 
 ### Frontend (`.env`)
 

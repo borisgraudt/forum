@@ -1,0 +1,41 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCookieHeader, getMe } from '../../lib/api';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const error = Astro.url.searchParams.get('error');
+---
+
+<BaseLayout title="New topic" user={user}>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Community</a>
+    <span class="sep">/</span>
+    <span>New topic</span>
+  </nav>
+
+  <div class="panel" style="max-width: 520px">
+    <div class="panel__head">
+      <h2>New topic</h2>
+    </div>
+    <form class="form" method="POST" action="/api/categories">
+      {error && <div class="alert">{error}</div>}
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" required maxlength="80" />
+      </div>
+      <div class="field">
+        <label for="description">Description (optional)</label>
+        <textarea id="description" name="description" maxlength="500"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Create</button>
+        <a class="btn btn-secondary" href="/">Cancel</a>
+      </div>
+    </form>
+  </div>
+</BaseLayout>
