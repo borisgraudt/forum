@@ -3,9 +3,6 @@
 //! Handlers/services in follow-up PRs will consume these types; schema tests
 //! already exercise them end-to-end against migrations.
 
-// Category/Thread/Post land in CRUD handlers next; allow until then.
-#![allow(dead_code, unused_imports)]
-
 mod category;
 mod post;
 mod thread;

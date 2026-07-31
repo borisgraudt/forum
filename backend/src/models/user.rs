@@ -57,6 +57,7 @@ pub struct User {
 }
 
 impl User {
+    #[allow(dead_code)] // used by admin/moderation paths next
     pub fn role_enum(&self) -> Result<UserRole, String> {
         UserRole::from_str(&self.role)
     }

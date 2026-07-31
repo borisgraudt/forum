@@ -166,6 +166,19 @@ CORS_ORIGIN=http://localhost:4321
 
 Cookie: `session` — httpOnly, SameSite=Lax, Secure when `COOKIE_SECURE=true`.
 
+### Forum API
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/categories` | no | List categories |
+| GET | `/api/v1/categories/{slug}` | no | Get category |
+| POST | `/api/v1/categories` | yes | Create category |
+| GET | `/api/v1/categories/{slug}/threads` | no | List threads (`limit`/`offset`) |
+| GET | `/api/v1/categories/{c}/threads/{t}` | no | Get thread |
+| POST | `/api/v1/categories/{slug}/threads` | yes | Create thread + first post |
+| GET | `/api/v1/categories/{c}/threads/{t}/posts` | no | List posts |
+| POST | `/api/v1/categories/{c}/threads/{t}/posts` | yes | Reply (403 if locked) |
+
 ### Frontend (`.env`)
 
 ```env

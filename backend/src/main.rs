@@ -20,7 +20,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::config::Config;
 use crate::error::AppResult;
-use crate::handlers::auth_router;
+use crate::handlers::{auth_router, categories_router, posts_router, threads_router};
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -74,6 +74,11 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
         .route("/health", get(health))
         .route("/api/v1/health", get(health))
         .nest("/api/v1/auth", auth_router())
+        .nest("/api/v1/categories", categories_router())
+        .nest(
+            "/api/v1",
+            Router::new().merge(threads_router()).merge(posts_router()),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state))
@@ -392,5 +397,166 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    async fn register_cookie(app: &Router, username: &str) -> String {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/auth/register")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(json_body(serde_json::json!({
+                        "username": username,
+                        "email": format!("{username}@example.com"),
+                        "password": "password123"
+                    })))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let session = cookie_from(&response).expect("cookie");
+        session.split(';').next().unwrap().to_string()
+    }
+
+    #[tokio::test]
+    async fn forum_crud_category_thread_post_flow() {
+        let state = test_state().await;
+        let app = build_router(state, "http://localhost:4321").expect("router");
+        let cookie = register_cookie(&app, "erin").await;
+
+        // Create category (auth)
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/categories")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &cookie)
+                    .body(json_body(serde_json::json!({
+                        "name": "General",
+                        "description": "General chat"
+                    })))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["category"]["slug"], "general");
+
+        // Create thread + first post
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/categories/general/threads")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &cookie)
+                    .body(json_body(serde_json::json!({
+                        "title": "Hello World",
+                        "body": "Opening post content"
+                    })))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["thread"]["slug"], "hello-world");
+        assert_eq!(json["thread"]["post_count"], 1);
+        assert_eq!(json["first_post"]["body"], "Opening post content");
+
+        // Reply
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/categories/general/threads/hello-world/posts")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &cookie)
+                    .body(json_body(serde_json::json!({
+                        "body": "A reply"
+                    })))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+
+        // List posts
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/categories/general/threads/hello-world/posts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["posts"].as_array().unwrap().len(), 2);
+
+        // Thread shows updated post_count
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/categories/general/threads/hello-world")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["thread"]["post_count"], 2);
+    }
+
+    #[tokio::test]
+    async fn create_thread_requires_auth() {
+        let state = test_state().await;
+        let app = build_router(state, "http://localhost:4321").expect("router");
+        let cookie = register_cookie(&app, "frank").await;
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/categories")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &cookie)
+                    .body(json_body(serde_json::json!({ "name": "Offtopic" })))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/categories/offtopic/threads")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(json_body(serde_json::json!({
+                        "title": "Nope",
+                        "body": "should fail"
+                    })))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }
