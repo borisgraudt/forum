@@ -1,0 +1,106 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import {
+  formatWhen,
+  getCategory,
+  getCookieHeader,
+  getMe,
+  listThreads,
+  ApiRequestError,
+} from '../../../lib/api';
+import type { Category, Thread } from '../../../lib/types';
+
+const { slug } = Astro.params;
+if (!slug) {
+  return Astro.redirect('/');
+}
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+
+let category: Category | undefined;
+let threads: Thread[] = [];
+let error: string | null = null;
+
+try {
+  category = await getCategory(slug, cookie);
+  threads = await listThreads(slug, cookie);
+} catch (e) {
+  if (e instanceof ApiRequestError && e.status === 404) {
+    return new Response(null, { status: 404, statusText: 'Not Found' });
+  }
+  error = e instanceof Error ? e.message : 'Could not load topic';
+}
+---
+
+<BaseLayout title={category?.name ?? 'Topic'} user={user}>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Community</a>
+    <span class="sep">/</span>
+    <span>{category?.name ?? slug}</span>
+  </nav>
+
+  {
+    error || !category ? (
+      <div class="alert">{error || 'Not found'}</div>
+    ) : (
+      <>
+        <section class="page-intro">
+          <h1>{category.name}</h1>
+          {category.description && <p>{category.description}</p>}
+        </section>
+
+        <div class="toolbar">
+          {user ? (
+            <a class="btn btn-primary" href={`/categories/${category.slug}/new`}>
+              Ask a question
+            </a>
+          ) : (
+            <a class="btn btn-primary" href="/login">
+              Sign in to post
+            </a>
+          )}
+        </div>
+
+        <div class="panel">
+          <div class="panel__head">
+            <h2>Discussions</h2>
+          </div>
+          {threads.length === 0 ? (
+            <div class="empty">
+              No discussions yet.
+              {user && (
+                <>
+                  {' '}
+                  <a href={`/categories/${category.slug}/new`}>Start one</a>.
+                </>
+              )}
+            </div>
+          ) : (
+            <ul class="list">
+              {threads.map((thread) => (
+                <li class="list-item">
+                  <a class="row" href={`/categories/${category.slug}/threads/${thread.slug}`}>
+                    <div class="row__main">
+                      <div class="row__title">
+                        {thread.is_pinned && <span class="badge">Pinned</span>}
+                        {thread.is_locked && <span class="badge">Locked</span>}
+                        {thread.title}
+                      </div>
+                      <div class="row__meta">
+                        {thread.post_count} {thread.post_count === 1 ? 'reply' : 'replies'}
+                      </div>
+                    </div>
+                    <div class="row__aside">
+                      {formatWhen(thread.last_post_at || thread.created_at)}
+                    </div>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </>
+    )
+  }
+</BaseLayout>

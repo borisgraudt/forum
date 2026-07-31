@@ -1,0 +1,39 @@
+---
+import type { UserPublic } from '../lib/types';
+
+type Props = {
+  user?: UserPublic | null;
+};
+
+const { user = null } = Astro.props;
+---
+
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="/">
+      <span class="brand__mark" aria-hidden="true">F</span>
+      <span>Forum</span>
+    </a>
+    <nav class="nav-actions" aria-label="Account">
+      {
+        user ? (
+          <>
+            <span class="nav-user">{user.display_name || user.username}</span>
+            <form method="POST" action="/logout" style="display:inline;margin:0">
+              <button class="btn btn-ghost" type="submit">
+                Sign out
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <a href="/login">Sign in</a>
+            <a class="btn btn-primary" href="/register">
+              Join
+            </a>
+          </>
+        )
+      }
+    </nav>
+  </div>
+</header>
