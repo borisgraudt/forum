@@ -1,4 +1,7 @@
 ---
-const slug = Astro.params.slug;
-return Astro.redirect(slug ? `/ask?category=${encodeURIComponent(slug)}` : '/ask');
+return Astro.redirect(
+  Astro.params.slug
+    ? `/ask?category=${encodeURIComponent(Astro.params.slug)}`
+    : '/ask',
+);
 ---
