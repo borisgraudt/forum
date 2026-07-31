@@ -13,7 +13,7 @@ impl CategoryService {
             SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at
             FROM categories
             WHERE parent_id IS NULL
-            ORDER BY sort_order ASC, name ASC
+            ORDER BY created_at ASC, id ASC
             "#,
         )
         .fetch_all(db)
@@ -27,7 +27,7 @@ impl CategoryService {
             SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at
             FROM categories
             WHERE parent_id = ?
-            ORDER BY sort_order ASC, name ASC
+            ORDER BY created_at ASC, id ASC
             "#,
         )
         .bind(parent_id)
