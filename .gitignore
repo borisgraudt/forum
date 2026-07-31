@@ -1,0 +1,35 @@
+# Rust
+backend/target/
+backend/forum.db
+backend/forum.db-*
+**/*.rs.bk
+
+# Node / Astro
+node_modules/
+frontend/dist/
+frontend/.astro/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+backend/.env
+
+# OS / IDE
+.DS_Store
+.idea/
+*.swp
+*.swo
+
+# Logs & coverage
+*.log
+coverage/
+.nyc_output/
+
+# Misc
+tmp/
+.cache/
