@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { forwardSetCookies } from '../lib/api';
 
-const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 
 export const POST: APIRoute = async ({ request, redirect }) => {
   const cookie = request.headers.get('cookie');

@@ -4,18 +4,19 @@ import { getCookieHeader, getMe, listChildren, listRootCategories } from '../lib
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
-const user = await getMe(cookie);
 
 type CommunityRow = {
   root: Category;
   children: Category[];
 };
 
+let user: Awaited<ReturnType<typeof getMe>> = null;
 let rows: CommunityRow[] = [];
 let error: string | null = null;
 
 try {
-  const roots = await listRootCategories(cookie);
+  const [me, roots] = await Promise.all([getMe(cookie), listRootCategories(cookie)]);
+  user = me;
   rows = await Promise.all(
     roots.map(async (root) => {
       let children: Category[] = [];
@@ -29,6 +30,7 @@ try {
   );
 } catch (e) {
   error = e instanceof Error ? e.message : 'Could not load communities';
+  if (!user) user = await getMe(cookie).catch(() => null);
 }
 ---
 

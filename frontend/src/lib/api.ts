@@ -1,6 +1,8 @@
 import type { ApiError, Category, Post, Thread, UserPublic } from './types';
 
-const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+// Prefer 127.0.0.1 over localhost: Node's fetch resolves localhost to ::1 first,
+// and the API often only listens on IPv4 — each SSR hop paid ~10ms+ of delay.
+const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 
 export class ApiRequestError extends Error {
   status: number;

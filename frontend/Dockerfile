@@ -8,7 +8,7 @@ RUN npm ci
 
 COPY . .
 
-ARG PUBLIC_API_URL=http://localhost:3000/api/v1
+ARG PUBLIC_API_URL=http://127.0.0.1:3000/api/v1
 ENV PUBLIC_API_URL=${PUBLIC_API_URL}
 
 RUN npm run build

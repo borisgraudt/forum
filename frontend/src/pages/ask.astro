@@ -16,11 +16,20 @@ let roots: Category[] = [];
 let leaves: Category[] = [];
 try {
   roots = await listRootCategories(cookie);
-  // Collect all subcategories (and roots with no children) as postable targets.
-  for (const root of roots) {
-    const kids = await listChildren(root.slug, cookie);
+  // Collect postable targets: bare roots or their subcategories (parallel).
+  const kidsByRoot = await Promise.all(
+    roots.map(async (root) => {
+      try {
+        return await listChildren(root.slug, cookie);
+      } catch {
+        return [] as Category[];
+      }
+    }),
+  );
+  for (let i = 0; i < roots.length; i++) {
+    const kids = kidsByRoot[i];
     if (kids.length === 0) {
-      leaves.push(root);
+      leaves.push(roots[i]);
     } else {
       leaves.push(...kids);
     }

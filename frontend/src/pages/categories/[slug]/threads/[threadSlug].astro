@@ -17,24 +17,32 @@ const { slug, threadSlug } = Astro.params;
 if (!slug || !threadSlug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
-const user = await getMe(cookie);
 
+let user: Awaited<ReturnType<typeof getMe>> = null;
 let category: Category | undefined;
 let thread: Thread | undefined;
 let posts: Post[] = [];
 let error: string | null = null;
 
 try {
-  const cat = await getCategory(slug, cookie);
+  // Parallel SSR: getMe + category + thread + posts in one round-trip window
+  const [me, cat, t, postList] = await Promise.all([
+    getMe(cookie),
+    getCategory(slug, cookie),
+    getThread(slug, threadSlug, cookie),
+    listPosts(slug, threadSlug, cookie),
+  ]);
+  user = me;
   category = cat.category;
-  const t = await getThread(slug, threadSlug, cookie);
   thread = t.thread;
-  posts = await listPosts(slug, threadSlug, cookie);
+  posts = postList;
 } catch (e) {
   if (e instanceof ApiRequestError && e.status === 404) {
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
   error = e instanceof Error ? e.message : 'Could not load thread';
+  // Still try to load user for header if data load failed for other reasons
+  if (!user) user = await getMe(cookie).catch(() => null);
 }
 
 const formError = Astro.url.searchParams.get('error');

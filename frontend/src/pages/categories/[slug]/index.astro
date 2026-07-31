@@ -17,15 +17,16 @@ const { slug } = Astro.params;
 if (!slug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
-const user = await getMe(cookie);
 
+let user: Awaited<ReturnType<typeof getMe>> = null;
 let category: Category | undefined;
 let children: Category[] = [];
 let threads: Thread[] = [];
 let error: string | null = null;
 
 try {
-  const data = await getCategory(slug, cookie);
+  const [me, data] = await Promise.all([getMe(cookie), getCategory(slug, cookie)]);
+  user = me;
   category = data.category;
   children = data.children ?? [];
   if (category.parent_id !== null || children.length === 0) {
@@ -36,13 +37,14 @@ try {
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
   error = e instanceof Error ? e.message : 'Could not load';
+  if (!user) user = await getMe(cookie).catch(() => null);
 }
 
 const isRoot = category?.parent_id === null;
 const showSubs = isRoot && children.length > 0;
 ---
 
-<BaseLayout title={category?.name ?? 'Community'} user={user} active="browse">
+<BaseLayout title={category?.name ?? 'Forum'} user={user} active="browse">
   {
     error || !category ? (
       <div class="alert">{error || 'Not found'}</div>
@@ -78,16 +80,12 @@ const showSubs = isRoot && children.length > 0;
                     <a class="stat-list__row" href={`/categories/${sub.slug}`}>
                       <span class="stat-list__main">
                         <span class="stat-list__title">{sub.name}</span>
-                        {sub.description && (
-                          <span class="stat-list__desc">{sub.description}</span>
-                        )}
+                        {sub.description && <span class="stat-list__desc">{sub.description}</span>}
                       </span>
                       <span class="stat-list__stats">
                         <span class="stat-list__stat" title="Topics">
                           <span class="stat-list__num">{topics}</span>
-                          <span class="stat-list__label">
-                            {topics === 1 ? 'topic' : 'topics'}
-                          </span>
+                          <span class="stat-list__label">{topics === 1 ? 'topic' : 'topics'}</span>
                         </span>
                         <span class="stat-list__stat" title="Views">
                           <span class="stat-list__num">{views}</span>
@@ -159,9 +157,7 @@ const showSubs = isRoot && children.length > 0;
                               {replies} {replies === 1 ? 'reply' : 'replies'}
                             </span>
                             <span class="topic-list__sep">·</span>
-                            <span>
-                              {views} views
-                            </span>
+                            <span>{views} views</span>
                             <span class="topic-list__sep">·</span>
                             <span>
                               asked by <span class="topic-list__user">{who}</span>
