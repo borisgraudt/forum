@@ -1,4 +1,12 @@
-import type { ApiError, Category, Post, Thread, UserPublic } from './types';
+import type {
+  ApiError,
+  Category,
+  PageMeta,
+  Post,
+  SearchHit,
+  Thread,
+  UserPublic,
+} from './types';
 
 // Prefer 127.0.0.1 over localhost: Node's fetch resolves localhost to ::1 first,
 // and the API often only listens on IPv4 — each SSR hop paid ~10ms+ of delay.
@@ -17,6 +25,7 @@ type RequestOptions = {
   method?: string;
   body?: unknown;
   cookie?: string | null;
+  csrfToken?: string | null;
 };
 
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
@@ -26,6 +35,9 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   }
   if (opts.cookie) {
     headers.set('Cookie', opts.cookie);
+  }
+  if (opts.csrfToken) {
+    headers.set('X-CSRF-Token', opts.csrfToken);
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -54,6 +66,15 @@ export function getCookieHeader(request: Request): string | null {
   return request.headers.get('cookie');
 }
 
+export function readCookieValue(cookieHeader: string | null | undefined, name: string): string | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(';')) {
+    const [k, ...rest] = part.trim().split('=');
+    if (k === name) return rest.join('=') || null;
+  }
+  return null;
+}
+
 export function forwardSetCookies(from: Response, to: { headers: Headers }): void {
   const anyHeaders = from.headers as Headers & { getSetCookie?: () => string[] };
   const cookies =
@@ -67,6 +88,54 @@ export function forwardSetCookies(from: Response, to: { headers: Headers }): voi
   for (const c of cookies) {
     to.headers.append('Set-Cookie', c);
   }
+}
+
+/** Ensure a CSRF cookie/token exists for mutating form posts. */
+export async function ensureCsrf(
+  cookie?: string | null,
+): Promise<{ token: string; setCookies: string[] }> {
+  const existing = readCookieValue(cookie, 'csrf');
+  if (existing) {
+    return { token: existing, setCookies: [] };
+  }
+
+  const res = await fetch(`${API_BASE}/auth/csrf`, {
+    headers: cookie ? { Cookie: cookie } : {},
+  });
+  if (!res.ok) {
+    throw new ApiRequestError(res.status, 'Could not issue CSRF token');
+  }
+  const data = (await res.json()) as { csrf_token: string };
+  const anyHeaders = res.headers as Headers & { getSetCookie?: () => string[] };
+  const setCookies =
+    typeof anyHeaders.getSetCookie === 'function'
+      ? anyHeaders.getSetCookie()
+      : (() => {
+          const single = res.headers.get('set-cookie');
+          return single ? [single] : [];
+        })();
+  return { token: data.csrf_token, setCookies };
+}
+
+export function applySetCookies(response: { headers: Headers }, setCookies: string[]) {
+  for (const c of setCookies) {
+    response.headers.append('Set-Cookie', c);
+  }
+}
+
+/** Build Cookie + X-CSRF-Token headers for backend mutating calls from a form. */
+export function mutationHeaders(
+  cookie: string | null,
+  form: FormData,
+): { headers: Record<string, string>; csrf: string | null } {
+  const csrf =
+    String(form.get('csrf_token') || '').trim() || readCookieValue(cookie, 'csrf') || null;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (cookie) headers.Cookie = cookie;
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+  return { headers, csrf };
 }
 
 export async function listRootCategories(cookie?: string | null) {
@@ -89,28 +158,20 @@ export async function listChildren(slug: string, cookie?: string | null) {
   return data.categories;
 }
 
-export async function createCategory(
-  body: {
-    name: string;
-    description?: string;
-    slug?: string;
-    parent_slug?: string;
-  },
+export async function listThreads(
+  categorySlug: string,
   cookie?: string | null,
+  page: { limit?: number; offset?: number } = {},
 ) {
-  return request<{ category: Category }>('/categories', {
-    method: 'POST',
-    body,
-    cookie,
-  });
-}
-
-export async function listThreads(categorySlug: string, cookie?: string | null) {
-  const data = await request<{ threads: Thread[] }>(
-    `/categories/${encodeURIComponent(categorySlug)}/threads`,
+  const qs = new URLSearchParams();
+  if (page.limit != null) qs.set('limit', String(page.limit));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  const q = qs.toString();
+  const data = await request<{ threads: Thread[] } & PageMeta>(
+    `/categories/${encodeURIComponent(categorySlug)}/threads${q ? `?${q}` : ''}`,
     { cookie },
   );
-  return data.threads;
+  return data;
 }
 
 export async function getThread(categorySlug: string, threadSlug: string, cookie?: string | null) {
@@ -120,23 +181,32 @@ export async function getThread(categorySlug: string, threadSlug: string, cookie
   );
 }
 
-export async function createThread(
+export async function listPosts(
   categorySlug: string,
-  body: { title: string; body: string; slug?: string },
+  threadSlug: string,
   cookie?: string | null,
+  page: { limit?: number; offset?: number } = {},
 ) {
-  return request<{ thread: Thread; first_post: Post }>(
-    `/categories/${encodeURIComponent(categorySlug)}/threads`,
-    { method: 'POST', body, cookie },
-  );
-}
-
-export async function listPosts(categorySlug: string, threadSlug: string, cookie?: string | null) {
-  const data = await request<{ posts: Post[] }>(
-    `/categories/${encodeURIComponent(categorySlug)}/threads/${encodeURIComponent(threadSlug)}/posts`,
+  const qs = new URLSearchParams();
+  // Thread view loads a generous page of posts by default.
+  qs.set('limit', String(page.limit ?? 100));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  const data = await request<{ posts: Post[] } & PageMeta>(
+    `/categories/${encodeURIComponent(categorySlug)}/threads/${encodeURIComponent(threadSlug)}/posts?${qs}`,
     { cookie },
   );
-  return data.posts;
+  return data;
+}
+
+export async function searchThreads(
+  q: string,
+  cookie?: string | null,
+  page: { limit?: number; offset?: number } = {},
+) {
+  const qs = new URLSearchParams({ q });
+  if (page.limit != null) qs.set('limit', String(page.limit));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  return request<{ results: SearchHit[]; q: string } & PageMeta>(`/search?${qs}`, { cookie });
 }
 
 export async function getMe(cookie?: string | null): Promise<UserPublic | null> {
@@ -147,6 +217,11 @@ export async function getMe(cookie?: string | null): Promise<UserPublic | null> 
     if (err instanceof ApiRequestError && err.status === 401) return null;
     throw err;
   }
+}
+
+export function isModerator(user: UserPublic | null | undefined): boolean {
+  if (!user) return false;
+  return user.role === 'moderator' || user.role === 'admin';
 }
 
 export function formatWhen(iso: string | null | undefined): string {
@@ -194,7 +269,7 @@ export function initials(name: string): string {
   return (p[0][0] + p[1][0]).toUpperCase();
 }
 
-/** Deterministic placeholder views until we track real counters. */
+/** @deprecated prefer thread.view_count */
 export function fakeViews(id: number): number {
   return 12 + ((id * 37) % 480);
 }
