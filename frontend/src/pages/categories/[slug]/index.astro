@@ -69,13 +69,13 @@ const showSubs = isRoot && children.length > 0;
                 </a>
               )}
             </div>
-            {/* Apple-style: name only, no descriptions on category page */}
-            <ul class="subcat-list">
+            <ul class="cat-list cat-list--flat">
               {children.map((sub) => (
                 <li>
-                  <a class="subcat-list__link" href={`/categories/${sub.slug}`}>
+                  <a class="cat-list__parent" href={`/categories/${sub.slug}`}>
                     {sub.name}
                   </a>
+                  {sub.description && <p class="cat-list__parent-desc">{sub.description}</p>}
                 </li>
               ))}
             </ul>

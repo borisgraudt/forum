@@ -74,11 +74,11 @@ try {
               {root.description && <p class="cat-list__parent-desc">{root.description}</p>}
 
               {children.length > 0 ? (
-                <ul class="cat-list__subs">
+                <ul class="cat-list__chips">
                   {children.map((sub) => (
                     <li>
-                      <a class="cat-list__sub" href={`/categories/${sub.slug}`}>
-                        <span class="cat-list__sub-name">{sub.name}</span>
+                      <a class="cat-list__chip" href={`/categories/${sub.slug}`}>
+                        {sub.name}
                       </a>
                     </li>
                   ))}

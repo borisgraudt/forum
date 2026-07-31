@@ -322,59 +322,55 @@ p {
   max-width: 40em;
 }
 
-.cat-list__subs {
+/* Compact multi-column chips for subcategories on Browse */
+.cat-list__chips {
   list-style: none;
-  margin: 0;
-  padding: 2px 0 2px 16px;
-  border-left: 2px solid var(--border-soft);
-  margin-left: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 20px;
 }
 
-.cat-list__sub {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 10px 0 10px 12px;
+.cat-list__chip {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
   text-decoration: none;
-  color: inherit;
-}
-
-.cat-list__sub:hover {
-  text-decoration: none;
-}
-
-.cat-list__sub:hover .cat-list__sub-name {
-  text-decoration: underline;
-  color: var(--ink);
-}
-
-.cat-list__sub-name {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
+  padding: 4px 0;
   line-height: 1.3;
 }
 
-.cat-list__sub-name::before {
+.cat-list__chip::before {
   content: '• ';
   color: var(--text-tertiary);
-  font-weight: 400;
 }
 
-.cat-list__sub-desc {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text-secondary);
-  line-height: 1.35;
-  padding-left: 12px;
-  max-width: 40em;
+.cat-list__chip:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--ink);
+  text-underline-offset: 3px;
 }
 
 .cat-list__empty {
   margin: 0;
-  padding: 4px 0 6px 16px;
+  padding: 4px 0 6px 0;
   font-size: 13px;
   color: var(--text-tertiary);
+}
+
+@media (max-width: 800px) {
+  .cat-list__chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .cat-list__chips {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* —— Subcategories on category page (Apple: name only, black underline) —— */
