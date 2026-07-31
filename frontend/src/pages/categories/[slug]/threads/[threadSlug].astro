@@ -1,13 +1,17 @@
 ---
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import CsrfInput from '../../../../components/CsrfInput.astro';
 import {
   ApiRequestError,
+  applySetCookies,
   authorLabel,
+  ensureCsrf,
   formatWhen,
   getCategory,
   getCookieHeader,
   getMe,
   initials,
+  isModerator,
   listPosts,
   getThread,
 } from '../../../../lib/api';
@@ -23,26 +27,36 @@ let category: Category | undefined;
 let thread: Thread | undefined;
 let posts: Post[] = [];
 let error: string | null = null;
+let csrfToken = '';
 
 try {
-  // Parallel SSR: getMe + category + thread + posts in one round-trip window
-  const [me, cat, t, postList] = await Promise.all([
+  const csrfP = ensureCsrf(cookie);
+  const [me, cat, t, postList, csrf] = await Promise.all([
     getMe(cookie),
     getCategory(slug, cookie),
     getThread(slug, threadSlug, cookie),
-    listPosts(slug, threadSlug, cookie),
+    listPosts(slug, threadSlug, cookie, { limit: 100 }),
+    csrfP,
   ]);
   user = me;
   category = cat.category;
   thread = t.thread;
-  posts = postList;
+  posts = postList.posts;
+  csrfToken = csrf.token;
+  applySetCookies(Astro.response, csrf.setCookies);
 } catch (e) {
   if (e instanceof ApiRequestError && e.status === 404) {
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
   error = e instanceof Error ? e.message : 'Could not load thread';
-  // Still try to load user for header if data load failed for other reasons
   if (!user) user = await getMe(cookie).catch(() => null);
+  if (!csrfToken) {
+    const csrf = await ensureCsrf(cookie).catch(() => null);
+    if (csrf) {
+      csrfToken = csrf.token;
+      applySetCookies(Astro.response, csrf.setCookies);
+    }
+  }
 }
 
 const formError = Astro.url.searchParams.get('error');
@@ -52,6 +66,12 @@ const topReply = replies[0];
 const restReplies = replies.slice(1);
 const opAuthor = op ? authorLabel(op) : '';
 const replyHref = user ? '#reply' : '/login';
+const canMod = isModerator(user);
+const views = thread?.view_count ?? 0;
+
+function bodyHtml(post: Post) {
+  return post.body_html || post.body;
+}
 ---
 
 <BaseLayout title={thread?.title ?? 'Topic'} user={user} active="browse">
@@ -60,11 +80,45 @@ const replyHref = user ? '#reply' : '/login';
       <div class="alert">{error || 'Not found'}</div>
     ) : (
       <div class="ad-thread">
-        <a class="ad-thread__community" href={`/categories/${category.slug}`}>
-          {category.name}
-        </a>
+        <div class="ad-thread__top">
+          <a class="ad-thread__community" href={`/categories/${category.slug}`}>
+            {category.name}
+          </a>
+          <span class="ad-thread__views">{views} views</span>
+        </div>
 
-        {/* Original question — matches example5.png */}
+        {canMod && (
+          <div class="mod-bar">
+            <form
+              method="POST"
+              action={`/api/categories/${category.slug}/threads/${thread.slug}/mod`}
+              class="mod-bar__form"
+            >
+              <CsrfInput token={csrfToken} />
+              {thread.is_locked ? (
+                <button class="btn btn-secondary btn-sm" name="action" value="unlock" type="submit">
+                  Unlock
+                </button>
+              ) : (
+                <button class="btn btn-secondary btn-sm" name="action" value="lock" type="submit">
+                  Lock
+                </button>
+              )}
+              {thread.is_pinned ? (
+                <button class="btn btn-secondary btn-sm" name="action" value="unpin" type="submit">
+                  Unpin
+                </button>
+              ) : (
+                <button class="btn btn-secondary btn-sm" name="action" value="pin" type="submit">
+                  Pin
+                </button>
+              )}
+            </form>
+          </div>
+        )}
+
+        {formError && <div class="alert">{formError}</div>}
+
         <article class="ad-post ad-post--op">
           <header class="ad-post__head">
             <div class="ad-post__avatar" aria-hidden="true">
@@ -79,7 +133,7 @@ const replyHref = user ? '#reply' : '/login';
           </header>
 
           <h1 class="ad-post__title">{thread.title}</h1>
-          <div class="ad-post__body">{op.body}</div>
+          <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
           <p class="ad-post__posted">Posted on {formatWhen(op.created_at)}</p>
 
           <div class="ad-post__footer">
@@ -106,7 +160,6 @@ const replyHref = user ? '#reply' : '/login';
           </div>
         </article>
 
-        {/* Top-ranking reply card (first reply), then rest — example5/6 */}
         {topReply && (
           <article class="ad-post ad-post--featured">
             <header class="ad-post__head">
@@ -124,7 +177,7 @@ const replyHref = user ? '#reply' : '/login';
             <p class="ad-post__posted ad-post__posted--inline">
               Posted on {formatWhen(topReply.created_at)}
             </p>
-            <div class="ad-post__body">{topReply.body}</div>
+            <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
 
             <div class="ad-post__footer">
               <div class="ad-post__actions" role="group" aria-label="Reply actions">
@@ -143,6 +196,18 @@ const replyHref = user ? '#reply' : '/login';
                     Reply
                   </a>
                 )}
+                {(canMod || (user && user.id === topReply.author_id)) && (
+                  <form
+                    method="POST"
+                    action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${topReply.id}`}
+                    class="inline-form"
+                  >
+                    <CsrfInput token={csrfToken} />
+                    <button type="submit" class="ad-pill ad-pill--danger">
+                      Delete
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </article>
@@ -151,6 +216,7 @@ const replyHref = user ? '#reply' : '/login';
         <section class="ad-replies" aria-label="Replies">
           {restReplies.map((post) => {
             const who = authorLabel(post);
+            const canDelete = canMod || (user && user.id === post.author_id);
             return (
               <article class="ad-post">
                 <header class="ad-post__head">
@@ -169,14 +235,9 @@ const replyHref = user ? '#reply' : '/login';
 
                 <p class="ad-post__posted ad-post__posted--inline">
                   {formatWhen(post.created_at)}
-                  {opAuthor && (
-                    <>
-                      {' '}
-                      in response to {opAuthor}
-                    </>
-                  )}
+                  {opAuthor && <> in response to {opAuthor}</>}
                 </p>
-                <div class="ad-post__body">{post.body}</div>
+                <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
 
                 <div class="ad-post__footer">
                   <div class="ad-post__actions" role="group" aria-label="Reply actions">
@@ -195,6 +256,18 @@ const replyHref = user ? '#reply' : '/login';
                         Reply
                       </a>
                     )}
+                    {canDelete && (
+                      <form
+                        method="POST"
+                        action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${post.id}`}
+                        class="inline-form"
+                      >
+                        <CsrfInput token={csrfToken} />
+                        <button type="submit" class="ad-pill ad-pill--danger">
+                          Delete
+                        </button>
+                      </form>
+                    )}
                   </div>
                 </div>
               </article>
@@ -209,18 +282,23 @@ const replyHref = user ? '#reply' : '/login';
         ) : user ? (
           <section class="ad-reply" id="reply">
             <h2 class="ad-reply__heading">Add a reply</h2>
-            {formError && <div class="alert">{formError}</div>}
             <form
               method="POST"
               action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
             >
+              <CsrfInput token={csrfToken} />
               <div class="ad-reply__box">
                 <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
                   {initials(user.display_name || user.username)}
                 </div>
                 <div class="ad-reply__editor-wrap">
                   <div class="ask-editor ad-reply__editor">
-                    <textarea name="body" required maxlength="50000" placeholder="Write a reply…" />
+                    <textarea
+                      name="body"
+                      required
+                      maxlength="50000"
+                      placeholder="Write a reply… Markdown supported."
+                    />
                     <div class="ask-toolbar" aria-hidden="true">
                       <span>B</span>
                       <span>I</span>
