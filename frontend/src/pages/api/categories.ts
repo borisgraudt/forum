@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { mutationHeaders } from '../../lib/api';
 
 const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 
@@ -8,6 +9,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const description = String(form.get('description') || '').trim();
   const parent_slug = String(form.get('parent_slug') || '').trim();
   const cookie = request.headers.get('cookie');
+  const { headers } = mutationHeaders(cookie, form);
 
   const body: Record<string, string> = { name };
   if (description) body.description = description;
@@ -15,10 +17,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
   const res = await fetch(`${API_BASE}/categories`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -33,7 +32,6 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
   const data = await res.json();
   const slug = data.category?.slug;
-  // After creating a subcategory, go to parent; top-level → new community page.
   if (parent_slug) return redirect(`/categories/${parent_slug}`, 303);
   return redirect(slug ? `/categories/${slug}` : '/', 303);
 };

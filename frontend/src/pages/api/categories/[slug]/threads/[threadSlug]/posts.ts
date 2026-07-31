@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { mutationHeaders } from '../../../../../../lib/api';
 
 const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 
@@ -9,15 +10,13 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
   const form = await request.formData();
   const body = String(form.get('body') || '').trim();
   const cookie = request.headers.get('cookie');
+  const { headers } = mutationHeaders(cookie, form);
 
   const res = await fetch(
     `${API_BASE}/categories/${encodeURIComponent(slug)}/threads/${encodeURIComponent(threadSlug)}/posts`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookie ? { Cookie: cookie } : {}),
-      },
+      headers,
       body: JSON.stringify({ body }),
     },
   );
