@@ -3,13 +3,15 @@ import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import {
   ApiRequestError,
   authorLabel,
+  fakeViews,
+  formatRelative,
   formatWhen,
   getCategory,
   getCookieHeader,
   getMe,
-  getThread,
   initials,
   listPosts,
+  getThread,
 } from '../../../../lib/api';
 import type { Category, Post, Thread } from '../../../../lib/types';
 
@@ -38,77 +40,154 @@ try {
 }
 
 const formError = Astro.url.searchParams.get('error');
+const op = posts[0];
+const replies = posts.slice(1);
+const views = thread ? fakeViews(thread.id) : 0;
+const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
 ---
 
 <BaseLayout title={thread?.title ?? 'Topic'} user={user} active="browse">
   {
-    error || !category || !thread ? (
+    error || !category || !thread || !op ? (
       <div class="alert">{error || 'Not found'}</div>
     ) : (
-      <>
-        <nav class="breadcrumb">
-          <a href="/">Browse</a>
-          <span>/</span>
+      <div class="ad-thread">
+        <nav class="ad-thread__crumbs" aria-label="Breadcrumb">
+          <a href="/">Browse Communities</a>
+          <span class="ad-thread__sep">/</span>
           <a href={`/categories/${category.slug}`}>{category.name}</a>
-          <span>/</span>
-          <span>Topic</span>
         </nav>
 
-        <header class="thread-header">
-          <h1>{thread.title}</h1>
-          <div class="thread-header__meta">
-            {authorLabel(thread)} · {thread.post_count} {thread.post_count === 1 ? 'post' : 'posts'}
-            {thread.is_locked && ' · Locked'}
-          </div>
+        <header class="ad-thread__header">
+          <h1 class="ad-thread__title">{thread.title}</h1>
+          <p class="ad-thread__summary">
+            <span>
+              Asked by <strong>{authorLabel(thread)}</strong>
+            </span>
+            <span class="ad-thread__dot">·</span>
+            <span title={formatWhen(thread.created_at)}>{formatRelative(thread.created_at)}</span>
+            <span class="ad-thread__dot">·</span>
+            <span>
+              {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            </span>
+            <span class="ad-thread__dot">·</span>
+            <span>{views} views</span>
+            {thread.is_locked && (
+              <>
+                <span class="ad-thread__dot">·</span>
+                <span>Locked</span>
+              </>
+            )}
+          </p>
         </header>
 
-        {posts.map((post, i) => {
-          const who = authorLabel(post);
-          return (
-            <article class="post-block">
-              <div class="post-avatar">{initials(who)}</div>
-              <div class="post-body">
-                <div class="post-body__meta">
-                  <span class="post-body__author">{who}</span>
-                  <span>#{i + 1}</span>
-                  <span>{formatWhen(post.created_at)}</span>
-                </div>
-                <div class="post-body__text">{post.body}</div>
+        {/* Original post */}
+        <article class="ad-post ad-post--op">
+          <div class="ad-post__avatar" aria-hidden="true">
+            {initials(authorLabel(op))}
+          </div>
+          <div class="ad-post__content">
+            <div class="ad-post__head">
+              <div class="ad-post__who">
+                <span class="ad-post__name">{authorLabel(op)}</span>
+                <span class="ad-post__role">Author</span>
               </div>
-            </article>
-          );
-        })}
-
-        {thread.is_locked ? (
-          <div class="empty">This topic is locked.</div>
-        ) : user ? (
-          <form
-            class="ask-body"
-            style="padding-inline:0;max-width:none"
-            method="POST"
-            action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
-          >
-            {formError && <div class="alert">{formError}</div>}
-            <div class="ask-editor">
-              <textarea name="body" required maxlength="50000" placeholder="Write a reply…" />
-              <div class="ask-toolbar">
-                <span>B</span>
-                <span>I</span>
-                <span>U</span>
-              </div>
+              <time class="ad-post__time" title={formatWhen(op.created_at)}>
+                {formatRelative(op.created_at)}
+              </time>
             </div>
-            <div class="ask-actions">
-              <button class="btn btn-primary" type="submit">
-                Post reply
+            <div class="ad-post__body">{op.body}</div>
+            <div class="ad-post__actions">
+              <button type="button" class="ad-post__action" disabled title="Coming soon">
+                Me too
               </button>
+              {!thread.is_locked && user && (
+                <a class="ad-post__action" href="#reply">
+                  Reply
+                </a>
+              )}
             </div>
-          </form>
+          </div>
+        </article>
+
+        {/* Replies */}
+        <section class="ad-replies" aria-label="Replies">
+          <div class="ad-replies__bar">
+            <h2 class="ad-replies__heading">
+              {replyCount === 0
+                ? 'No replies yet'
+                : `${replyCount} ${replyCount === 1 ? 'Reply' : 'Replies'}`}
+            </h2>
+            {replyCount > 0 && <span class="ad-replies__sort">Oldest first</span>}
+          </div>
+
+          {replies.map((post) => {
+            const who = authorLabel(post);
+            return (
+              <article class="ad-post">
+                <div class="ad-post__avatar" aria-hidden="true">
+                  {initials(who)}
+                </div>
+                <div class="ad-post__content">
+                  <div class="ad-post__head">
+                    <div class="ad-post__who">
+                      <span class="ad-post__name">{who}</span>
+                    </div>
+                    <time class="ad-post__time" title={formatWhen(post.created_at)}>
+                      {formatRelative(post.created_at)}
+                    </time>
+                  </div>
+                  <div class="ad-post__body">{post.body}</div>
+                  <div class="ad-post__actions">
+                    <button type="button" class="ad-post__action" disabled title="Coming soon">
+                      Helpful
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        {/* Reply box */}
+        {thread.is_locked ? (
+          <div class="ad-locked">This topic is locked.</div>
+        ) : user ? (
+          <section class="ad-reply" id="reply">
+            <h2 class="ad-reply__heading">Add a reply</h2>
+            {formError && <div class="alert">{formError}</div>}
+            <form
+              method="POST"
+              action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
+            >
+              <div class="ad-reply__box">
+                <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
+                  {initials(user.display_name || user.username)}
+                </div>
+                <div class="ad-reply__editor-wrap">
+                  <div class="ask-editor ad-reply__editor">
+                    <textarea name="body" required maxlength="50000" placeholder="Write a reply…" />
+                    <div class="ask-toolbar" aria-hidden="true">
+                      <span>B</span>
+                      <span>I</span>
+                      <span>U</span>
+                    </div>
+                  </div>
+                  <div class="ad-reply__actions">
+                    <button class="btn btn-primary" type="submit">
+                      Post reply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </section>
         ) : (
-          <div class="empty">
+          <div class="ad-signin">
             <a href="/login">Sign in</a> to reply.
           </div>
         )}
-      </>
+      </div>
     )
   }
 </BaseLayout>
