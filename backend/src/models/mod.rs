@@ -3,8 +3,7 @@
 //! Handlers/services in follow-up PRs will consume these types; schema tests
 //! already exercise them end-to-end against migrations.
 
-// Public domain surface for upcoming API layers; binary-only crate flags unused
-// items as dead_code / unused re-exports until those layers land.
+// Category/Thread/Post land in CRUD handlers next; allow until then.
 #![allow(dead_code, unused_imports)]
 
 mod category;

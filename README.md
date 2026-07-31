@@ -149,9 +149,22 @@ HOST=0.0.0.0
 PORT=3000
 DATABASE_URL=sqlite:forum.db?mode=rwc
 JWT_SECRET=change-me-to-a-long-random-string
+JWT_TTL_SECS=604800
+COOKIE_SECURE=false
 RUST_LOG=info
 CORS_ORIGIN=http://localhost:4321
 ```
+
+### Auth API (`/api/v1/auth`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/register` | Create account, set `session` httpOnly cookie |
+| POST | `/login` | Login (username or email), set cookie |
+| POST | `/logout` | Clear session cookie |
+| GET | `/me` | Current user (requires cookie) |
+
+Cookie: `session` — httpOnly, SameSite=Lax, Secure when `COOKIE_SECURE=true`.
 
 ### Frontend (`.env`)
 
