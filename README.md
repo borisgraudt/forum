@@ -47,6 +47,7 @@ forum/
 │   │   ├── config.rs
 │   │   ├── db.rs
 │   │   ├── error.rs
+│   │   ├── models/          # users, categories, threads, posts
 │   │   └── state.rs
 │   ├── migrations/
 │   └── Cargo.toml

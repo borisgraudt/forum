@@ -1,4 +1,3 @@
 -- Foundation migration.
--- Domain tables (users, categories, threads, posts) land in a follow-up PR.
--- WAL is enabled at connection time in the application as well.
+-- Domain tables live in later migrations; WAL is also set per-connection in app code.
 PRAGMA journal_mode = WAL;
