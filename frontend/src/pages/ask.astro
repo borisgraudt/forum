@@ -54,16 +54,37 @@ try {
     <form method="POST" action="/api/ask">
       <div class="ask-field">
         <label for="category">Community / topic</label>
-        <select id="category" name="category" required>
-          <option value="" disabled selected={!preselect}> Select a topic </option>
-          {
-            leaves.map((c) => (
-              <option value={c.slug} selected={c.slug === preselect}>
-                {c.name}
-              </option>
-            ))
-          }
-        </select>
+        <div class="ask-select">
+          <select
+            id="category"
+            name="category"
+            required
+            class="ask-select__control"
+            aria-label="Community / topic"
+          >
+            <option value="" disabled selected={!preselect}>
+              Select a topic
+            </option>
+            {
+              leaves.map((c) => (
+                <option value={c.slug} selected={c.slug === preselect}>
+                  {c.name}
+                </option>
+              ))
+            }
+          </select>
+          <span class="ask-select__chevron" aria-hidden="true">
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+              <path
+                d="M1 1.5L6 6.5L11 1.5"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+        </div>
       </div>
 
       <div class="ask-field">
@@ -74,6 +95,7 @@ try {
           type="text"
           required
           maxlength="200"
+          class="ask-input"
           placeholder="Summarize your question"
         />
       </div>

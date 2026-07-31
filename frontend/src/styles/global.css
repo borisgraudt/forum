@@ -951,28 +951,112 @@ a.ad-pill--solid:hover {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
 }
 
+.ask-input,
 .ask-field input,
-.ask-field select,
 .field select {
   width: 100%;
   font: inherit;
   font-size: 15px;
-  padding: 12px 14px;
+  padding: 13px 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
   color: var(--text);
   outline: none;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
+.ask-input::placeholder,
+.ask-field input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.ask-input:hover,
+.ask-field input:hover {
+  border-color: #b0b0b5;
+}
+
+.ask-input:focus,
 .ask-field input:focus,
-.ask-field select:focus,
 .field select:focus {
   border-color: var(--ink);
   box-shadow: 0 0 0 3px rgba(45, 41, 40, 0.12);
+}
+
+/* Custom select — same surface as title/editor, muted placeholder */
+.ask-select {
+  position: relative;
+  display: block;
+}
+
+.ask-select__control {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.35;
+  padding: 13px 44px 13px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+/* Empty / placeholder option state */
+.ask-select__control:invalid {
+  color: var(--text-tertiary);
+}
+
+.ask-select__control:valid {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ask-select__control:hover {
+  border-color: #b0b0b5;
+}
+
+.ask-select__control:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(45, 41, 40, 0.12);
+  color: var(--text);
+}
+
+.ask-select__control option {
+  color: var(--text);
+  font-weight: 400;
+  background: #fff;
+}
+
+.ask-select__control option[value=''] {
+  color: var(--text-tertiary);
+}
+
+.ask-select__chevron {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.ask-select:focus-within .ask-select__chevron {
+  color: var(--ink);
 }
 
 .ask-actions {
