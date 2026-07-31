@@ -18,7 +18,6 @@ try {
   const roots = await listRootCategories(cookie);
   rows = await Promise.all(
     roots.map(async (root) => {
-      // Dedicated children endpoint (more reliable than nested payload)
       let children: Category[] = [];
       try {
         children = await listChildren(root.slug, cookie);
@@ -66,45 +65,57 @@ try {
           )}
         </div>
 
-        <ul class="cat-tree">
+        {/* NodeBB-style: parent category block + nested sub rows */}
+        <div class="forum-cats">
           {rows.map(({ root, children }) => (
-            <li class="cat-tree__block">
-              <div class="cat-tree__root-row">
-                <a class="cat-tree__root" href={`/categories/${root.slug}`}>
-                  {root.name}
-                </a>
+            <section class="forum-cat">
+              <header class="forum-cat__header">
+                <div class="forum-cat__header-main">
+                  <h2 class="forum-cat__title">
+                    <a href={`/categories/${root.slug}`}>{root.name}</a>
+                  </h2>
+                  {root.description && <p class="forum-cat__desc">{root.description}</p>}
+                </div>
                 {user && (
-                  <a class="cat-tree__add" href={`/categories/new?parent=${root.slug}`}>
-                    + subcategory
+                  <a class="forum-cat__add" href={`/categories/new?parent=${root.slug}`}>
+                    + sub
                   </a>
                 )}
-              </div>
-              {root.description && <p class="cat-tree__root-desc">{root.description}</p>}
+              </header>
 
               {children.length > 0 ? (
-                <ul class="cat-tree__subs">
+                <ul class="forum-cat__children">
                   {children.map((sub) => (
                     <li>
-                      <a href={`/categories/${sub.slug}`}>
-                        <span class="cat-tree__bullet" aria-hidden="true">
-                          •
-                        </span>
-                        <span class="cat-tree__sub-main">
-                          <span class="cat-tree__sub-name">{sub.name}</span>
+                      <a class="forum-cat__child" href={`/categories/${sub.slug}`}>
+                        <span class="forum-cat__child-icon" aria-hidden="true" />
+                        <span class="forum-cat__child-body">
+                          <span class="forum-cat__child-name">{sub.name}</span>
                           {sub.description && (
-                            <span class="cat-tree__sub-desc">{sub.description}</span>
+                            <span class="forum-cat__child-desc">{sub.description}</span>
                           )}
+                        </span>
+                        <span class="forum-cat__child-go" aria-hidden="true">
+                          →
                         </span>
                       </a>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p class="cat-tree__empty-subs">No subcategories yet.</p>
+                <p class="forum-cat__empty">
+                  No subcategories.
+                  {user && (
+                    <>
+                      {' '}
+                      <a href={`/categories/new?parent=${root.slug}`}>Add one</a>
+                    </>
+                  )}
+                </p>
               )}
-            </li>
+            </section>
           ))}
-        </ul>
+        </div>
       </>
     )
   }
