@@ -572,62 +572,38 @@ p {
 }
 
 /* —— Thread page (Apple Discussions style) —— */
+/* —— Thread (Apple Discussions layout) —— */
 .ad-thread {
-  max-width: 760px;
+  max-width: 920px;
 }
 
-.ad-thread__crumbs {
+.ad-thread__nav {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-tertiary);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
   margin-bottom: 20px;
 }
 
-.ad-thread__crumbs a {
-  color: var(--text-secondary);
+.ad-thread__community {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
   text-decoration: none;
 }
 
-.ad-thread__crumbs a:hover {
-  color: var(--ink);
+.ad-thread__community:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.ad-thread__sep {
-  color: var(--border);
-}
-
-.ad-thread__header {
-  margin-bottom: 28px;
-  padding-bottom: 4px;
-}
-
-.ad-thread__title {
-  font-size: clamp(26px, 3.5vw, 34px);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  color: var(--text);
-  margin-bottom: 12px;
-}
-
-.ad-thread__summary {
-  font-size: 13px;
+.ad-thread__meta-line {
+  font-size: 12px;
   color: var(--text-tertiary);
-  line-height: 1.45;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px 0;
-}
-
-.ad-thread__summary strong {
-  font-weight: 600;
-  color: var(--text-secondary);
 }
 
 .ad-thread__dot {
@@ -635,75 +611,84 @@ p {
   color: #d2d2d7;
 }
 
-/* Post cards */
+/* Post: left author column + main content (Apple ASC) */
 .ad-post {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 14px;
-  padding: 22px 0;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 20px 28px;
+  padding: 28px 0;
   border-top: 1px solid var(--border-soft);
 }
 
 .ad-post--op {
-  border-top: none;
-  padding-top: 0;
-  margin-bottom: 8px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 24px;
+}
+
+.ad-post__user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
 }
 
 .ad-post__avatar {
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: #e8e8ed;
   color: #6e6e73;
   display: grid;
   place-items: center;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   flex-shrink: 0;
 }
 
-.ad-post__content {
-  min-width: 0;
-}
-
-.ad-post__head {
+.ad-post__identity {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.ad-post__who {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .ad-post__name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.01em;
+  word-break: break-word;
 }
 
 .ad-post__role {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-tertiary);
-  background: var(--bg-soft);
-  padding: 2px 8px;
-  border-radius: 999px;
+  color: #fff;
+  background: var(--ink);
+  padding: 1px 7px;
+  border-radius: 4px;
+  line-height: 1.4;
 }
 
-.ad-post__time {
+.ad-post__level {
   font-size: 12px;
   color: var(--text-tertiary);
-  white-space: nowrap;
-  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.ad-post__main {
+  min-width: 0;
+}
+
+.ad-post__title {
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--text);
+  margin: 0 0 16px;
 }
 
 .ad-post__body {
@@ -714,11 +699,22 @@ p {
   word-break: break-word;
 }
 
+.ad-post__posted {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.ad-post__posted--top {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
 .ad-post__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .ad-post__action {
@@ -729,9 +725,12 @@ p {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 980px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   cursor: pointer;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 a.ad-post__action:hover,
@@ -741,6 +740,12 @@ button.ad-post__action:hover:not(:disabled) {
   text-decoration: none;
 }
 
+.ad-post__action--primary {
+  color: var(--ink);
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
 .ad-post__action:disabled {
   opacity: 0.55;
   cursor: default;
@@ -748,7 +753,7 @@ button.ad-post__action:hover:not(:disabled) {
 
 /* Replies section */
 .ad-replies {
-  margin-top: 12px;
+  margin: 0;
 }
 
 .ad-replies__bar {
@@ -756,40 +761,46 @@ button.ad-post__action:hover:not(:disabled) {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 0 4px;
+  padding: 20px 0 4px;
   border-top: 1px solid var(--border-soft);
+  margin-top: 4px;
 }
 
 .ad-replies__heading {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text);
 }
 
 .ad-replies__sort {
-  font-size: 12px;
-  color: var(--text-tertiary);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ad-replies__sort strong {
+  font-weight: 600;
+  color: var(--text);
 }
 
 /* Reply composer */
 .ad-reply {
-  margin-top: 28px;
-  padding-top: 24px;
+  margin-top: 8px;
+  padding-top: 28px;
   border-top: 1px solid var(--border-soft);
 }
 
 .ad-reply__heading {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .ad-reply__box {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 20px 28px;
   align-items: start;
 }
 
@@ -817,22 +828,32 @@ button.ad-post__action:hover:not(:disabled) {
   text-underline-offset: 2px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .ad-post,
   .ad-reply__box {
-    grid-template-columns: 36px minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .ad-post__avatar,
-  .ad-reply__avatar {
-    width: 34px;
-    height: 34px;
-    font-size: 11px;
+  .ad-post__user,
+  .ad-reply__user {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
   }
 
-  .ad-thread__title {
-    font-size: 24px;
+  .ad-post__avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 13px;
+  }
+
+  .ad-post__level {
+    display: none;
+  }
+
+  .ad-post__title {
+    font-size: 22px;
   }
 }
 

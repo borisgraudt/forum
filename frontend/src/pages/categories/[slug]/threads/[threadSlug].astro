@@ -4,7 +4,6 @@ import {
   ApiRequestError,
   authorLabel,
   fakeViews,
-  formatRelative,
   formatWhen,
   getCategory,
   getCookieHeader,
@@ -52,21 +51,11 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
       <div class="alert">{error || 'Not found'}</div>
     ) : (
       <div class="ad-thread">
-        <nav class="ad-thread__crumbs" aria-label="Breadcrumb">
-          <a href="/">Browse Communities</a>
-          <span class="ad-thread__sep">/</span>
-          <a href={`/categories/${category.slug}`}>{category.name}</a>
-        </nav>
-
-        <header class="ad-thread__header">
-          <h1 class="ad-thread__title">{thread.title}</h1>
-          <p class="ad-thread__summary">
-            <span>
-              Asked by <strong>{authorLabel(thread)}</strong>
-            </span>
-            <span class="ad-thread__dot">·</span>
-            <span title={formatWhen(thread.created_at)}>{formatRelative(thread.created_at)}</span>
-            <span class="ad-thread__dot">·</span>
+        <nav class="ad-thread__nav" aria-label="Breadcrumb">
+          <a class="ad-thread__community" href={`/categories/${category.slug}`}>
+            {category.name}
+          </a>
+          <span class="ad-thread__meta-line">
             <span>
               {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
             </span>
@@ -78,31 +67,37 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
                 <span>Locked</span>
               </>
             )}
-          </p>
-        </header>
+          </span>
+        </nav>
 
-        {/* Original post */}
+        {/* Original post — title lives inside the OP card, like Apple Discussions */}
         <article class="ad-post ad-post--op">
-          <div class="ad-post__avatar" aria-hidden="true">
-            {initials(authorLabel(op))}
-          </div>
-          <div class="ad-post__content">
-            <div class="ad-post__head">
-              <div class="ad-post__who">
-                <span class="ad-post__name">{authorLabel(op)}</span>
-                <span class="ad-post__role">Author</span>
-              </div>
-              <time class="ad-post__time" title={formatWhen(op.created_at)}>
-                {formatRelative(op.created_at)}
-              </time>
+          <aside class="ad-post__user">
+            <div class="ad-post__avatar" aria-hidden="true">
+              {initials(authorLabel(op))}
             </div>
+            <div class="ad-post__identity">
+              <span class="ad-post__name">{authorLabel(op)}</span>
+              <span class="ad-post__role">Author</span>
+            </div>
+            <p class="ad-post__level">Member</p>
+          </aside>
+
+          <div class="ad-post__main">
+            <h1 class="ad-post__title">{thread.title}</h1>
             <div class="ad-post__body">{op.body}</div>
+            <p class="ad-post__posted">Posted on {formatWhen(op.created_at)}</p>
             <div class="ad-post__actions">
               <button type="button" class="ad-post__action" disabled title="Coming soon">
                 Me too
               </button>
               {!thread.is_locked && user && (
-                <a class="ad-post__action" href="#reply">
+                <a class="ad-post__action ad-post__action--primary" href="#reply">
+                  Reply
+                </a>
+              )}
+              {!thread.is_locked && !user && (
+                <a class="ad-post__action ad-post__action--primary" href="/login">
                   Reply
                 </a>
               )}
@@ -110,38 +105,49 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
           </div>
         </article>
 
-        {/* Replies */}
-        <section class="ad-replies" aria-label="Replies">
-          <div class="ad-replies__bar">
-            <h2 class="ad-replies__heading">
-              {replyCount === 0
-                ? 'No replies yet'
-                : `${replyCount} ${replyCount === 1 ? 'Reply' : 'Replies'}`}
-            </h2>
-            {replyCount > 0 && <span class="ad-replies__sort">Oldest first</span>}
-          </div>
+        {/* Replies header */}
+        <div class="ad-replies__bar">
+          <h2 class="ad-replies__heading">
+            {replyCount === 0
+              ? 'No replies yet'
+              : `${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`}
+          </h2>
+          {replyCount > 0 && (
+            <span class="ad-replies__sort">
+              Sort By: <strong>Rank</strong>
+            </span>
+          )}
+        </div>
 
+        <section class="ad-replies" aria-label="Replies">
           {replies.map((post) => {
             const who = authorLabel(post);
             return (
               <article class="ad-post">
-                <div class="ad-post__avatar" aria-hidden="true">
-                  {initials(who)}
-                </div>
-                <div class="ad-post__content">
-                  <div class="ad-post__head">
-                    <div class="ad-post__who">
-                      <span class="ad-post__name">{who}</span>
-                    </div>
-                    <time class="ad-post__time" title={formatWhen(post.created_at)}>
-                      {formatRelative(post.created_at)}
-                    </time>
+                <aside class="ad-post__user">
+                  <div class="ad-post__avatar" aria-hidden="true">
+                    {initials(who)}
                   </div>
+                  <div class="ad-post__identity">
+                    <span class="ad-post__name">{who}</span>
+                  </div>
+                  <p class="ad-post__level">Member</p>
+                </aside>
+
+                <div class="ad-post__main">
+                  <p class="ad-post__posted ad-post__posted--top">
+                    Posted on {formatWhen(post.created_at)}
+                  </p>
                   <div class="ad-post__body">{post.body}</div>
                   <div class="ad-post__actions">
                     <button type="button" class="ad-post__action" disabled title="Coming soon">
                       Helpful
                     </button>
+                    {!thread.is_locked && user && (
+                      <a class="ad-post__action" href="#reply">
+                        Reply
+                      </a>
+                    )}
                   </div>
                 </div>
               </article>
@@ -149,7 +155,7 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
           })}
         </section>
 
-        {/* Reply box */}
+        {/* Reply composer */}
         {thread.is_locked ? (
           <div class="ad-locked">This topic is locked.</div>
         ) : user ? (
@@ -161,9 +167,14 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
               action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
             >
               <div class="ad-reply__box">
-                <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
-                  {initials(user.display_name || user.username)}
-                </div>
+                <aside class="ad-post__user ad-reply__user">
+                  <div class="ad-post__avatar" aria-hidden="true">
+                    {initials(user.display_name || user.username)}
+                  </div>
+                  <div class="ad-post__identity">
+                    <span class="ad-post__name">{user.display_name || user.username}</span>
+                  </div>
+                </aside>
                 <div class="ad-reply__editor-wrap">
                   <div class="ask-editor ad-reply__editor">
                     <textarea name="body" required maxlength="50000" placeholder="Write a reply…" />
