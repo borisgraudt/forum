@@ -64,45 +64,43 @@ cd forum-0.1.0-alpha.1-*
 ./run-frontend.sh  # :4321
 ```
 
-## GitHub Packages (container images)
+## GitHub Packages (one package: **forum**)
 
-Images are published to **GitHub Container Registry**:
+There is a **single** package named **`forum`**:
 
-| Image | Name |
-|-------|------|
-| API | `ghcr.io/<owner>/forum-backend` |
-| UI | `ghcr.io/<owner>/forum-frontend` |
+```text
+ghcr.io/borisgraudt/forum
+```
 
-Example (this repo):
+Backend and UI are **tags** of that package (not two packages):
+
+| Role | Tags |
+|------|------|
+| API | `backend`, `backend-edge`, `backend-0.1.0-alpha.1`, `backend-sha-…` |
+| UI | `frontend`, `frontend-edge`, `frontend-0.1.0-alpha.1`, `frontend-sha-…` |
 
 ```bash
 # public pull (if package visibility is public)
-docker pull ghcr.io/borisgraudt/forum-backend:0.1.0-alpha.1
-docker pull ghcr.io/borisgraudt/forum-frontend:0.1.0-alpha.1
+docker pull ghcr.io/borisgraudt/forum:backend-edge
+docker pull ghcr.io/borisgraudt/forum:frontend-edge
+
+# version from release tag v0.1.0-alpha.1
+docker pull ghcr.io/borisgraudt/forum:backend-0.1.0-alpha.1
+docker pull ghcr.io/borisgraudt/forum:frontend-0.1.0-alpha.1
 
 # private packages: authenticate first
 echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
 ```
 
-Tags:
-
-- `edge` — latest successful build from `develop` / `main` (workflow `Packages`)
-- `0.1.0-alpha.1` — version from git tag `v0.1.0-alpha.1` (workflow `Release`)
-- `sha-<short>` — immutable git SHA tags
-
-After the first push, open the repo → **Packages** (right sidebar) or:
-
-`https://github.com/borisgraudt/forum/pkgs/container/forum-backend`
-
-To link packages to the repo UI, ensure image labels include  
-`org.opencontainers.image.source=https://github.com/borisgraudt/forum` (already set in CI).
+After the first push: repo → **Packages** → **forum**  
+or `https://github.com/borisgraudt/forum/pkgs/container/forum`
 
 ### Run from GHCR with Compose
 
 ```bash
 export JWT_SECRET="$(openssl rand -hex 32)"
-export BACKEND_IMAGE=ghcr.io/borisgraudt/forum-backend:edge
-export FRONTEND_IMAGE=ghcr.io/borisgraudt/forum-frontend:edge
+export BACKEND_IMAGE=ghcr.io/borisgraudt/forum:backend-edge
+export FRONTEND_IMAGE=ghcr.io/borisgraudt/forum:frontend-edge
 docker compose --profile app up -d
 ```
 
