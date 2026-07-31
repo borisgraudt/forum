@@ -137,7 +137,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for Git flow and PR rules.
 | Lint & format | `make lint` / `make fmt` | rustfmt, clippy `-D warnings`, Prettier, `astro check` |
 | Tests | `make test` | Unit + HTTP smoke tests on backend |
 | Package (tarball) | `make package` | Portable archive under `dist/` / Release **Assets** |
-| GitHub Packages | GHCR images on tag / `develop` | Repo **Packages** tab (`forum-backend`, `forum-frontend`) |
+| GitHub Packages | one package **`forum`** on GHCR | tags `backend-*` / `frontend-*` |
 | Docker | `make docker-up` | Compose profile `app` |
 | Git flow | `main` ← `develop` ← `feature/*` | Details in CONTRIBUTING |
 | CI | `.github/workflows/ci.yml` | fmt · clippy · test · frontend build · audit on every PR |
