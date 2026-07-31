@@ -1,252 +1,169 @@
 # Forum
 
-High-performance, security-focused forum engine built with **Rust + Astro**.
+Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI.
 
-Designed for niche communities that value speed, low resource usage, and strong security guarantees.
+Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-> Single responsibility: be extremely fast and hard to break.
-
----
-
-## Tech Stack
-
-### Backend
-| Technology | Purpose |
-|----------|--------|
-| **Rust** | Memory safety + maximum performance |
-| **Axum** | Modern, ergonomic web framework |
-| **SQLx** | Async SQL with compile-time checked queries |
-| **SQLite** (WAL mode) | Extremely fast, zero-config, single-file database |
-| **Tower** | Middleware (CORS, trace, rate limiting) |
-| **jsonwebtoken** + **bcrypt** | Authentication |
-| **pulldown-cmark** + **ammonia** | Markdown rendering + HTML sanitization |
-| **validator** + **serde** | Input validation |
-
-### Frontend
-| Technology | Purpose |
-|----------|--------|
-| **Astro** | Server-rendered UI, minimal JS |
-| **TypeScript** | Type safety |
-
-### Infrastructure
-- Docker + Docker Compose
-- sqlx-cli for migrations
-- Makefile for common tasks
+**Current version:** `0.2.0`
 
 ---
 
-## Project Structure
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| API | Rust, Axum, SQLx, SQLite (WAL), JWT cookie auth |
+| UI | Astro (Node adapter), TypeScript |
+| Content | Markdown (pulldown-cmark) + ammonia sanitize |
+| Search | SQLite FTS5 |
+| Ops | Docker Compose, GHCR, Makefile, GitHub Actions |
+
+---
+
+## Layout
 
 ```text
 forum/
-├── backend/                 # Rust + Axum API
-│   ├── src/
-│   │   ├── main.rs
-│   │   ├── config.rs
-│   │   ├── db.rs
-│   │   ├── error.rs
-│   │   ├── models/          # users, categories, threads, posts
-│   │   └── state.rs
-│   ├── migrations/
-│   └── Cargo.toml
-│
-├── frontend/                # Astro
-│   ├── src/
-│   └── package.json
-│
-├── .github/workflows/ci.yml
+├── backend/          # API + migrations
+├── frontend/         # Astro UI
+├── .github/workflows/
 ├── docker-compose.yml
 ├── Makefile
-├── CONTRIBUTING.md
 └── README.md
 ```
 
 ---
 
-## Getting Started
+## Quick start
 
-### Prerequisites
-
-- Rust (latest stable) — install via `rustup`
-- Node.js 20+
-- sqlx-cli: `cargo install sqlx-cli --no-default-features --features sqlite`
-- Docker (optional)
-
-### 1. Clone & setup
+**Prereqs:** Rust stable, Node 22+, optional `sqlx-cli` / `cargo-watch`.
 
 ```bash
-git clone <your-repo-url> ultraforum
-cd ultraforum
-```
-
-### 2. Backend
-
-```bash
+# Backend
 cd backend
 cp .env.example .env
-# edit .env if needed
+sqlx database create && sqlx migrate run
+cargo run          # :3000
 
-# Create database and run migrations
-sqlx database create
-sqlx migrate run
-
-# Run in development
-cargo watch -x run
-```
-
-Backend will be available at `http://localhost:3000`
-
-### 3. Frontend
-
-```bash
+# Frontend (other terminal)
 cd frontend
 npm install
-cp .env.example .env
-
-npm run dev
+cp .env.example .env   # PUBLIC_API_URL=http://127.0.0.1:3000/api/v1
+npm run dev            # :4321
 ```
 
-Frontend will be available at `http://localhost:4321`
-
-UI is a minimal community shell (Apple Discussions–inspired): topics, threads, posts, sign-in/join. Start the backend first so SSR can reach the API.
-
-### 4. Development with Makefile (recommended)
+Or:
 
 ```bash
-make setup        # deps + .env
-make migrate      # apply SQLx migrations
-make dev          # cargo-watch backend + Astro HMR
-make lint         # rustfmt + clippy + frontend lint
-make test         # backend tests
-make build        # production build
-make audit        # cargo audit + npm audit
+make setup && make migrate && make dev
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for Git flow and PR rules.
+### Useful make targets
 
----
+| Target | What |
+|--------|------|
+| `make dev` | API + UI (needs cargo-watch) |
+| `make test` | Backend tests |
+| `make lint` | fmt, clippy, frontend check |
+| `make build` | Release backend + frontend build |
+| `make package` | Portable tarball under `dist/` |
+| `make docker-up` | Compose stack |
 
-## Workflows
+### Moderator / admin
 
-| Workflow | Command / place | Notes |
-|----------|-----------------|-------|
-| Local development | `make dev` | Backend `:3000`, frontend `:4321` |
-| Migrations | `make migrate` | SQLx + files in `backend/migrations/` |
-| Lint & format | `make lint` / `make fmt` | rustfmt, clippy `-D warnings`, Prettier, `astro check` |
-| Tests | `make test` | Unit + HTTP smoke tests on backend |
-| Package (tarball) | `make package` | Portable archive under `dist/` / Release **Assets** |
-| GitHub Packages | one package **`forum`** on GHCR | tags `backend-*` / `frontend-*` |
-| Docker | `make docker-up` | Compose profile `app` |
-| Git flow | `main` ← `develop` ← `feature/*` | Details in CONTRIBUTING |
-| CI | `.github/workflows/ci.yml` | fmt · clippy · test · frontend build · audit on every PR |
-| Release | tag `v*` → release workflow | Tarballs + GHCR + GitHub Release |
-| Security | `make audit` | `cargo audit` + `npm audit --audit-level=high` |
+No separate admin UI yet. Promote a user, then use Lock / Pin / Delete on a thread page:
 
-See **[docs/DEPLOY.md](./docs/DEPLOY.md)** for production env, Docker, **GitHub Packages**, and pre-releases.
-
-**Current version:** `0.1.0-alpha.1`
-
----
-
-## Environment Variables
-
-### Backend (`.env`)
-
-```env
-HOST=0.0.0.0
-PORT=3000
-DATABASE_URL=sqlite:forum.db?mode=rwc
-JWT_SECRET=change-me-to-a-long-random-string
-JWT_TTL_SECS=604800
-COOKIE_SECURE=false
-RUST_LOG=info
-CORS_ORIGIN=http://localhost:4321
-```
-
-### Auth API (`/api/v1/auth`)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/register` | Create account, set `session` httpOnly cookie |
-| POST | `/login` | Login (username or email), set cookie |
-| POST | `/logout` | Clear session cookie |
-| GET | `/me` | Current user (requires cookie) |
-
-Cookie: `session` — httpOnly, SameSite=Lax, Secure when `COOKIE_SECURE=true`.
-
-### Forum hierarchy
-
-```text
-Community (root category)  →  Subcategory  →  Topic (thread)  →  Posts
-```
-
-UI matches Apple Discussions: **Browse** grid → subcategory list → topics → thread.
-
-### Forum API
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/categories` | no | List **root** communities |
-| GET | `/api/v1/categories/{slug}` | no | Get category (+ `children` if root) |
-| GET | `/api/v1/categories/{slug}/children` | no | List subcategories |
-| POST | `/api/v1/categories` | yes | Create community or subcategory (`parent_slug`) |
-| GET | `/api/v1/categories/{slug}/threads` | no | List topics in a category |
-| GET | `/api/v1/categories/{c}/threads/{t}` | no | Get topic |
-| POST | `/api/v1/categories/{slug}/threads` | yes | Create topic + first post |
-| GET/POST | `.../posts` | reply needs auth | List / reply |
-
-### Frontend (`.env`)
-
-```env
-PUBLIC_API_URL=http://localhost:3000/api/v1
+```bash
+sqlite3 backend/forum.db "UPDATE users SET role = 'moderator' WHERE username = 'you';"
 ```
 
 ---
 
-## Security Highlights
+## API sketch (`/api/v1`)
 
-- Memory-safe backend (Rust)
-- httpOnly + Secure + SameSite cookies for sessions
-- CSRF double-submit cookie (`csrf` + `X-CSRF-Token`)
-- Strict CORS (`CORS_ORIGIN`)
-- Security headers (CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
-- Input validation on every endpoint
-- In-memory IP rate limiting
-- Prepared statements only (SQLx)
-- Markdown sanitized with ammonia (no raw HTML scripts)
+| Area | Paths |
+|------|--------|
+| Auth | `POST /auth/register\|login\|logout`, `GET /auth/me`, `GET /auth/csrf` |
+| Categories | `GET/POST /categories`, `GET …/{slug}`, `GET …/{slug}/children` |
+| Threads | `GET/POST …/threads`, `GET/PATCH …/threads/{t}` |
+| Posts | `GET/POST …/posts`, `DELETE …/posts/{id}` |
+| Search | `GET /search?q=` |
 
----
-
-## Performance Goals
-
-- TTFB < 30ms on modest hardware
-- Very low memory footprint
-- Excellent Lighthouse scores (especially Performance & Best Practices)
-- Single binary backend possible
+Mutating requests need CSRF: cookie `csrf` + header `X-CSRF-Token`.
 
 ---
 
-## Roadmap
+## Security (current)
 
-### Done (v0.2)
-1. Core CRUD + Auth
-2. Category hierarchy + Apple-style UI
-3. Markdown + sanitization
-4. Pagination (threads / posts / search)
-5. Search (SQLite FTS5)
-6. CSRF, security headers, rate limiting
-7. Real view counters
-8. Basic moderation (lock / pin / delete post)
+- httpOnly session cookie, optional Secure
+- CSRF double-submit
+- Security headers + IP rate limit
+- Input validation, prepared statements
+- Sanitized Markdown HTML
 
-### Next (v0.3+)
-- Admin panel
-- Me too / Helpful votes
-- Attachments / images
-- Email / password reset
-- Production HSTS + reverse-proxy guides
+---
+
+## Roadmap to v1.0.0
+
+### Done (through v0.2)
+- Auth, CRUD, category hierarchy
+- Apple-style Browse / Ask / Thread UI
+- Markdown, pagination, FTS search
+- CSRF, headers, rate limit, view counts
+- Basic mod actions (lock / pin / delete)
+
+### v0.3 — Product depth
+- [ ] **Admin panel** (`/admin`): users, roles, reports, global settings
+- [ ] **Me too / Helpful** votes (real counts, not placeholders)
+- [ ] **Quote / reply-to** a specific post
+- [ ] **Edit own posts** (with history optional)
+- [ ] **User profiles** (public page, activity)
+
+### v0.4 — Trust & safety
+- [ ] **Report** content + mod queue
+- [ ] **Ban / mute** users
+- [ ] **Audit log** of mod actions
+- [ ] **Stricter rate limits** per endpoint (auth / post)
+- [ ] **Password reset** (email or admin-issued)
+
+### v0.5 — Content & media
+- [ ] **Attachments / images** (upload + size limits + scan)
+- [ ] **Avatars**
+- [ ] **Better markdown toolbar** (real formatting, not decorative)
+- [ ] **Drafts** (optional)
+
+### v0.6 — Discovery & UX
+- [ ] **Notifications** (replies, mentions)
+- [ ] **Watch / subscribe** thread or category
+- [ ] **Sort threads** (activity, newest, unanswered)
+- [ ] **“Solved” / accepted answer**
+- [ ] Mobile polish + empty/error states
+
+### v0.7 — Ops / production
+- [ ] Reverse-proxy ready (HSTS, secure cookies by default in prod)
+- [ ] Backups story for SQLite (docs + script in Makefile or cron example)
+- [ ] Metrics / health depth (optional Prometheus)
+- [ ] Structured logging
+- [ ] E2E smoke tests in CI
+
+### v0.8–0.9 — Hardening
+- [ ] Full API docs (OpenAPI)
+- [ ] Seed / demo data command
+- [ ] Permission matrix review
+- [ ] Load test notes + defaults for small communities
+- [ ] i18n-ready strings (if you care about RU/EN)
+
+### v1.0.0 — “Ship it”
+- [ ] Feature freeze of the above core
+- [ ] Stable API versioning commitment for `/api/v1`
+- [ ] Release checklist + tagged `v1.0.0`
+- [ ] Known limitations documented in README
+- [ ] No critical open security issues
+
+**Not required for v1.0** (later): multi-tenant SaaS, realtime websockets, email digests, federation, full SPA rewrite.
 
 ---
 
 ## License
 
-MIT
+No license file is shipped in this repo. Add one if you open-source or redistribute.

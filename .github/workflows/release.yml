@@ -57,9 +57,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          chmod +x scripts/package.sh
-          ./scripts/package.sh
+        run: make package
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -215,6 +213,6 @@ jobs:
             ./run-frontend.sh
             ```
 
-            See `docs/DEPLOY.md`.
+            Docker Compose: `docker compose --profile app up -d --build`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
