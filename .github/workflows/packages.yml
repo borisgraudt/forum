@@ -1,0 +1,92 @@
+# Publish container images to GitHub Packages (GHCR) without cutting a full release.
+# Use for develop/main continuous images, or re-publish a tag manually.
+
+name: Packages
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/packages.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (default: edge or git sha)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  push:
+    name: Build & push GHCR images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image names
+        id: img
+        shell: bash
+        run: |
+          OWNER_LC="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          REPO_LC="$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
+          TAG_INPUT="${{ github.event.inputs.tag }}"
+          if [[ -n "$TAG_INPUT" ]]; then
+            TAG="$TAG_INPUT"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME#v}"
+          else
+            TAG="edge"
+          fi
+          SHA_SHORT="$(echo '${{ github.sha }}' | cut -c1-7)"
+          echo "backend=ghcr.io/${OWNER_LC}/${REPO_LC}-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${OWNER_LC}/${REPO_LC}-frontend" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ steps.img.outputs.backend }}:${{ steps.img.outputs.tag }}
+            ${{ steps.img.outputs.backend }}:sha-${{ steps.img.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=forum-backend
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            PUBLIC_API_URL=http://localhost:3000/api/v1
+          tags: |
+            ${{ steps.img.outputs.frontend }}:${{ steps.img.outputs.tag }}
+            ${{ steps.img.outputs.frontend }}:sha-${{ steps.img.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=forum-frontend
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

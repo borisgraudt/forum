@@ -7,9 +7,20 @@ UltraForum is designed for simple self-hosting: **one Rust binary + SQLite file*
 | Mode | Command | When |
 |------|---------|------|
 | Local dev | `make dev` | day-to-day coding |
-| Release package | `make package` | tarball with binary + UI |
-| Docker | `make docker-up` | compose profile `app` |
-| GitHub pre-release | tag `vX.Y.Z-alpha.N` | CI builds assets |
+| Release **Assets** (tar.gz) | `make package` / GitHub Release | downloadable archive on a Release |
+| **GitHub Packages** (GHCR) | tag `v*` or push to `develop` | container images next to the repo |
+| Docker (local build) | `make docker-up` | compose profile `app` |
+| GitHub pre-release | tag `vX.Y.Z-alpha.N` | Assets + Packages |
+
+### Releases vs Packages vs Tags (GitHub UI)
+
+| Thing | What it is |
+|-------|------------|
+| **Tag** | Git pointer (`v0.1.0-alpha.1`). Repo shows “1 tag” after the first one. |
+| **Release** | Notes + optional **Assets** (our `.tar.gz`). Always tied to **one tag**. |
+| **GitHub Packages** | Separate registry (here: **GHCR** Docker images). Shown under the repo **Packages** tab, not as a “tag”. |
+
+So “1 tag” after the first pre-release is **normal** — not a bug.
 
 ## Environment
 
@@ -53,7 +64,49 @@ cd forum-0.1.0-alpha.1-*
 ./run-frontend.sh  # :4321
 ```
 
-## Docker Compose
+## GitHub Packages (container images)
+
+Images are published to **GitHub Container Registry**:
+
+| Image | Name |
+|-------|------|
+| API | `ghcr.io/<owner>/forum-backend` |
+| UI | `ghcr.io/<owner>/forum-frontend` |
+
+Example (this repo):
+
+```bash
+# public pull (if package visibility is public)
+docker pull ghcr.io/borisgraudt/forum-backend:0.1.0-alpha.1
+docker pull ghcr.io/borisgraudt/forum-frontend:0.1.0-alpha.1
+
+# private packages: authenticate first
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+```
+
+Tags:
+
+- `edge` — latest successful build from `develop` / `main` (workflow `Packages`)
+- `0.1.0-alpha.1` — version from git tag `v0.1.0-alpha.1` (workflow `Release`)
+- `sha-<short>` — immutable git SHA tags
+
+After the first push, open the repo → **Packages** (right sidebar) or:
+
+`https://github.com/borisgraudt/forum/pkgs/container/forum-backend`
+
+To link packages to the repo UI, ensure image labels include  
+`org.opencontainers.image.source=https://github.com/borisgraudt/forum` (already set in CI).
+
+### Run from GHCR with Compose
+
+```bash
+export JWT_SECRET="$(openssl rand -hex 32)"
+export BACKEND_IMAGE=ghcr.io/borisgraudt/forum-backend:edge
+export FRONTEND_IMAGE=ghcr.io/borisgraudt/forum-frontend:edge
+docker compose --profile app up -d
+```
+
+## Docker Compose (local build)
 
 ```bash
 export JWT_SECRET="$(openssl rand -hex 32)"

@@ -7,10 +7,11 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 env:
   CARGO_TERM_COLOR: always
-  VERSION_STRIP: ${{ github.ref_name }}
+  REGISTRY: ghcr.io
 
 jobs:
   package:
@@ -69,9 +70,92 @@ jobs:
             dist/*.sha256
           if-no-files-found: error
 
+  # GitHub Packages = container registry (ghcr.io), not Release Assets.
+  packages:
+    name: Publish to GitHub Packages (GHCR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version
+        id: ver
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          OWNER_LC="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          REPO_LC="$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "owner=${OWNER_LC}" >> "$GITHUB_OUTPUT"
+          echo "image_backend=ghcr.io/${OWNER_LC}/${REPO_LC}-backend" >> "$GITHUB_OUTPUT"
+          echo "image_frontend=ghcr.io/${OWNER_LC}/${REPO_LC}-frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta (backend)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.ver.outputs.image_backend }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.ver.outputs.version }}
+            type=raw,value=${{ steps.ver.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.version, '-') }}
+            type=raw,value=edge
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=forum-backend
+            org.opencontainers.image.description=Forum API (Rust + Axum + SQLite)
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker meta (frontend)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.ver.outputs.image_frontend }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.ver.outputs.version }}
+            type=raw,value=${{ steps.ver.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.version, '-') }}
+            type=raw,value=edge
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            PUBLIC_API_URL=http://localhost:3000/api/v1
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=forum-frontend
+            org.opencontainers.image.description=Forum UI (Astro)
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   publish:
     name: GitHub Release
-    needs: package
+    needs: [package, packages]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,14 +171,20 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          OWNER_LC="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          REPO_LC="$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
           if [[ "$TAG" == *-* ]]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "backend=ghcr.io/${OWNER_LC}/${REPO_LC}-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${OWNER_LC}/${REPO_LC}-frontend" >> "$GITHUB_OUTPUT"
 
-      - name: Create release
+      - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
@@ -107,9 +197,14 @@ jobs:
           body: |
             ## Forum ${{ steps.meta.outputs.tag }}
 
-            Portable package: Rust API binary + Astro UI (Node) + migrations.
+            ### GitHub Packages (container images)
+            ```bash
+            docker pull ${{ steps.meta.outputs.backend }}:${{ steps.meta.outputs.version }}
+            docker pull ${{ steps.meta.outputs.frontend }}:${{ steps.meta.outputs.version }}
+            ```
+            Packages tab: https://github.com/${{ github.repository }}/pkgs/container/${{ github.event.repository.name }}-backend
 
-            ### Quick start
+            ### Portable tarball
             ```bash
             tar -xzf forum-*-*.tar.gz
             cd forum-*
@@ -117,6 +212,6 @@ jobs:
             ./run-frontend.sh
             ```
 
-            See `docs/DEPLOY.md` inside the archive.
+            See `docs/DEPLOY.md`.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
