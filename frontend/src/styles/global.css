@@ -329,7 +329,7 @@ p {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px 20px;
+  gap: 2px 20px;
 }
 
 .cat-list__chip {
@@ -338,7 +338,7 @@ p {
   font-weight: 400;
   color: var(--text-secondary);
   text-decoration: none;
-  padding: 4px 0;
+  padding: 2px 0;
   line-height: 1.3;
 }
 
