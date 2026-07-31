@@ -37,6 +37,19 @@ impl PostService {
         Ok(rows)
     }
 
+    pub async fn count_by_thread(db: &SqlitePool, thread_id: i64) -> AppResult<i64> {
+        let count =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts WHERE thread_id = ?")
+                .bind(thread_id)
+                .fetch_one(db)
+                .await?;
+        Ok(count)
+    }
+
+    pub async fn get_view(db: &SqlitePool, post_id: i64) -> AppResult<PostView> {
+        ThreadService::get_post_view(db, post_id).await
+    }
+
     pub async fn create_reply(
         db: &SqlitePool,
         thread_id: i64,
@@ -81,5 +94,54 @@ impl PostService {
         tx.commit().await?;
 
         ThreadService::get_post_view(db, post.id).await
+    }
+
+    pub async fn delete(db: &SqlitePool, post_id: i64) -> AppResult<()> {
+        let post = sqlx::query_as::<_, Post>("SELECT * FROM posts WHERE id = ?")
+            .bind(post_id)
+            .fetch_optional(db)
+            .await?
+            .ok_or(AppError::NotFound)?;
+
+        let mut tx: Transaction<'_, sqlx::Sqlite> = db.begin().await?;
+
+        let result = sqlx::query("DELETE FROM posts WHERE id = ?")
+            .bind(post_id)
+            .execute(&mut *tx)
+            .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        // Keep post_count consistent (never below 0).
+        sqlx::query(
+            r#"
+            UPDATE threads
+            SET post_count = MAX(post_count - 1, 0),
+                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id = ?
+            "#,
+        )
+        .bind(post.thread_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Refresh last_post_at from remaining posts.
+        sqlx::query(
+            r#"
+            UPDATE threads
+            SET last_post_at = (
+                SELECT MAX(created_at) FROM posts WHERE thread_id = threads.id
+            )
+            WHERE id = ?
+            "#,
+        )
+        .bind(post.thread_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
     }
 }
