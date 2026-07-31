@@ -110,6 +110,8 @@ npm run dev
 
 Frontend will be available at `http://localhost:4321`
 
+UI is a minimal community shell (Apple Discussions–inspired): topics, threads, posts, sign-in/join. Start the backend first so SSR can reach the API.
+
 ### 4. Development with Makefile (recommended)
 
 ```bash
