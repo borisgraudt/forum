@@ -17,18 +17,16 @@ Designed for niche communities that value speed, low resource usage, and strong 
 | **Axum** | Modern, ergonomic web framework |
 | **SQLx** | Async SQL with compile-time checked queries |
 | **SQLite** (WAL mode) | Extremely fast, zero-config, single-file database |
-| **Tower** | Middleware (timeouts, rate limiting, etc.) |
+| **Tower** | Middleware (CORS, trace, rate limiting) |
 | **jsonwebtoken** + **bcrypt** | Authentication |
-| **pulldown-cmark** | Safe & fast Markdown rendering |
+| **pulldown-cmark** + **ammonia** | Markdown rendering + HTML sanitization |
 | **validator** + **serde** | Input validation |
 
 ### Frontend
 | Technology | Purpose |
 |----------|--------|
-| **Astro** | Zero-JS by default, excellent performance |
+| **Astro** | Server-rendered UI, minimal JS |
 | **TypeScript** | Type safety |
-| **Tailwind CSS** | Utility-first styling |
-| **HTMX** (optional) | Progressive enhancement without heavy JS |
 
 ### Infrastructure
 - Docker + Docker Compose
@@ -208,13 +206,14 @@ PUBLIC_API_URL=http://localhost:3000/api/v1
 ## Security Highlights
 
 - Memory-safe backend (Rust)
-- httpOnly + Secure + SameSite cookies
-- CSRF protection
-- Strict CORS
-- Security headers (CSP, HSTS, X-Content-Type-Options, etc.)
+- httpOnly + Secure + SameSite cookies for sessions
+- CSRF double-submit cookie (`csrf` + `X-CSRF-Token`)
+- Strict CORS (`CORS_ORIGIN`)
+- Security headers (CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
 - Input validation on every endpoint
-- Rate limiting (Tower layer)
+- In-memory IP rate limiting
 - Prepared statements only (SQLx)
+- Markdown sanitized with ammonia (no raw HTML scripts)
 
 ---
 
@@ -229,13 +228,22 @@ PUBLIC_API_URL=http://localhost:3000/api/v1
 
 ## Roadmap
 
+### Done (v0.2)
 1. Core CRUD + Auth
-2. Markdown + sanitization
-3. Pagination & sorting
-4. Search (FTS5)
-5. Admin panel
-6. Rate limiting & moderation tools
-7. Production hardening + deployment guides
+2. Category hierarchy + Apple-style UI
+3. Markdown + sanitization
+4. Pagination (threads / posts / search)
+5. Search (SQLite FTS5)
+6. CSRF, security headers, rate limiting
+7. Real view counters
+8. Basic moderation (lock / pin / delete post)
+
+### Next (v0.3+)
+- Admin panel
+- Me too / Helpful votes
+- Attachments / images
+- Email / password reset
+- Production HSTS + reverse-proxy guides
 
 ---
 
