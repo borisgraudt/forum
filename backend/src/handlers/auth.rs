@@ -6,11 +6,12 @@ use axum::Router;
 use axum_extra::extract::CookieJar;
 use validator::Validate;
 
-use crate::dto::{AuthResponse, LoginRequest, RegisterRequest};
+use crate::dto::{AuthResponse, CsrfResponse, LoginRequest, RegisterRequest};
 use crate::error::AppResult;
 use crate::middleware::AuthUser;
 use crate::services::AuthService;
 use crate::state::AppState;
+use crate::utils::csrf::{generate_csrf_token, read_csrf_cookie, set_csrf_cookie};
 use crate::utils::{clear_auth_cookie, set_auth_cookie, validation_error};
 
 pub fn auth_router() -> Router<AppState> {
@@ -19,6 +20,16 @@ pub fn auth_router() -> Router<AppState> {
         .route("/login", post(login))
         .route("/logout", post(logout))
         .route("/me", get(me))
+        .route("/csrf", get(csrf))
+}
+
+async fn csrf(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> AppResult<(StatusCode, CookieJar, Json<CsrfResponse>)> {
+    let token = read_csrf_cookie(&jar).unwrap_or_else(generate_csrf_token);
+    let jar = set_csrf_cookie(jar, token.clone(), &state.config);
+    Ok((StatusCode::OK, jar, Json(CsrfResponse { csrf_token: token })))
 }
 
 async fn register(
@@ -49,6 +60,8 @@ async fn register(
 
     let token = AuthService::issue_token(&user, &state.config.jwt_secret, state.config.jwt_ttl)?;
     let jar = set_auth_cookie(jar, token, &state.config);
+    let csrf = generate_csrf_token();
+    let jar = set_csrf_cookie(jar, csrf, &state.config);
 
     Ok((
         StatusCode::CREATED,
@@ -71,6 +84,8 @@ async fn login(
 
     let token = AuthService::issue_token(&user, &state.config.jwt_secret, state.config.jwt_ttl)?;
     let jar = set_auth_cookie(jar, token, &state.config);
+    let csrf = generate_csrf_token();
+    let jar = set_csrf_cookie(jar, csrf, &state.config);
 
     Ok((
         StatusCode::OK,
