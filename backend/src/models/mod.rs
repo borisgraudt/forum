@@ -9,7 +9,7 @@ mod thread;
 mod user;
 
 pub use category::Category;
-pub use post::{Post, PostView};
+pub use post::{Post, PostView, PostViewJson};
 pub use thread::{Thread, ThreadView};
 pub use user::{User, UserPublic, UserRole};
 
