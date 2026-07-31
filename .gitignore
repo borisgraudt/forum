@@ -33,3 +33,7 @@ coverage/
 # Misc
 tmp/
 .cache/
+
+# Release packages
+dist/
+
