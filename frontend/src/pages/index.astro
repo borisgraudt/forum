@@ -77,7 +77,12 @@ try {
                 <ul class="cat-list__subs">
                   {children.map((sub) => (
                     <li>
-                      <a href={`/categories/${sub.slug}`}>{sub.name}</a>
+                      <a class="cat-list__sub" href={`/categories/${sub.slug}`}>
+                        <span class="cat-list__sub-name">{sub.name}</span>
+                        {sub.description && (
+                          <span class="cat-list__sub-desc">{sub.description}</span>
+                        )}
+                      </a>
                     </li>
                   ))}
                 </ul>

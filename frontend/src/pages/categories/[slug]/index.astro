@@ -3,10 +3,11 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import {
   ApiRequestError,
   authorLabel,
-  formatWhen,
+  formatRelative,
   getCategory,
   getCookieHeader,
   getMe,
+  initials,
   listThreads,
 } from '../../../lib/api';
 import type { Category, Thread } from '../../../lib/types';
@@ -68,13 +69,14 @@ const showSubs = isRoot && children.length > 0;
                 </a>
               )}
             </div>
-            <ul class="sub-list">
+            {/* Same shape as parent on Browse: name + description */}
+            <ul class="cat-list cat-list--flat">
               {children.map((sub) => (
                 <li>
-                  <a href={`/categories/${sub.slug}`}>
-                    <span class="sub-list__name">{sub.name}</span>
-                    <span class="sub-list__meta">{sub.description || 'View topics'}</span>
+                  <a class="cat-list__parent" href={`/categories/${sub.slug}`}>
+                    {sub.name}
                   </a>
+                  {sub.description && <p class="cat-list__parent-desc">{sub.description}</p>}
                 </li>
               ))}
             </ul>
@@ -82,17 +84,21 @@ const showSubs = isRoot && children.length > 0;
           </>
         ) : (
           <>
-            <div class="toolbar-row">
-              {user ? (
-                <a class="btn btn-primary btn-sm" href={`/ask?category=${category.slug}`}>
-                  Ask a question
-                </a>
-              ) : (
-                <a class="btn btn-primary btn-sm" href="/login">
-                  Sign in to post
-                </a>
-              )}
+            <div class="topic-toolbar">
+              <span class="topic-toolbar__label">Thread</span>
+              <div class="topic-toolbar__right">
+                {user ? (
+                  <a class="btn btn-primary btn-sm" href={`/ask?category=${category.slug}`}>
+                    Ask a question
+                  </a>
+                ) : (
+                  <a class="btn btn-primary btn-sm" href="/login">
+                    Sign in to post
+                  </a>
+                )}
+              </div>
             </div>
+
             {threads.length === 0 ? (
               <div class="empty">
                 No topics yet.
@@ -104,21 +110,41 @@ const showSubs = isRoot && children.length > 0;
                 )}
               </div>
             ) : (
-              <ul class="thread-list">
-                {threads.map((t) => (
-                  <li>
-                    <a href={`/categories/${category.slug}/threads/${t.slug}`}>
-                      <div class="thread-list__title">
-                        {t.is_pinned && <span class="badge">Pinned</span>}
-                        {t.title}
-                      </div>
-                      <div class="thread-list__meta">
-                        {authorLabel(t)} · {t.post_count} {t.post_count === 1 ? 'post' : 'posts'} ·{' '}
-                        {formatWhen(t.last_post_at || t.created_at)}
-                      </div>
-                    </a>
-                  </li>
-                ))}
+              <ul class="topic-list">
+                {threads.map((t) => {
+                  const who = authorLabel(t);
+                  const replies = Math.max(0, t.post_count - 1);
+                  const activity = formatRelative(t.last_post_at || t.created_at);
+                  return (
+                    <li class="topic-list__item">
+                      <a
+                        class="topic-list__link"
+                        href={`/categories/${category.slug}/threads/${t.slug}`}
+                      >
+                        <span class="topic-list__avatar" aria-hidden="true">
+                          {initials(who)}
+                        </span>
+                        <span class="topic-list__main">
+                          <span class="topic-list__title">
+                            {t.is_pinned && <span class="badge">Pinned</span>}
+                            {t.title}
+                          </span>
+                          <span class="topic-list__meta">
+                            <span>Latest activity {activity}</span>
+                            <span class="topic-list__sep">·</span>
+                            <span>
+                              {replies} {replies === 1 ? 'reply' : 'replies'}
+                            </span>
+                            <span class="topic-list__sep">·</span>
+                            <span>
+                              asked by <span class="topic-list__user">{who}</span>
+                            </span>
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </>

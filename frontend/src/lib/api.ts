@@ -160,6 +160,24 @@ export function formatWhen(iso: string | null | undefined): string {
   });
 }
 
+export function formatRelative(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const sec = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+  if (sec < 60) return 'less than a minute ago';
+  const min = Math.round(sec / 60);
+  if (min === 1) return '1 minute ago';
+  if (min < 60) return `${min} minutes ago`;
+  const hr = Math.round(min / 60);
+  if (hr === 1) return '1 hour ago';
+  if (hr < 24) return `${hr} hours ago`;
+  const day = Math.round(hr / 24);
+  if (day === 1) return '1 day ago';
+  if (day < 30) return `${day} days ago`;
+  return formatWhen(iso);
+}
+
 export function authorLabel(item: {
   author_username?: string;
   author_display_name?: string | null;

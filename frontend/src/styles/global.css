@@ -281,7 +281,7 @@ p {
   max-width: 36em;
 }
 
-/* —— Category list: parent row + indented subs (simple, clear) —— */
+/* —— Category list: parent + nested subs with descriptions —— */
 .cat-list {
   list-style: none;
   margin: 0;
@@ -291,7 +291,11 @@ p {
 
 .cat-list > li {
   border-bottom: 1px solid var(--border-soft);
-  padding: 16px 0 12px;
+  padding: 18px 0 14px;
+}
+
+.cat-list--flat > li {
+  padding: 16px 0;
 }
 
 .cat-list__parent {
@@ -301,7 +305,7 @@ p {
   letter-spacing: -0.015em;
   color: var(--text);
   text-decoration: none;
-  padding: 2px 0 8px;
+  padding: 0 0 4px;
 }
 
 .cat-list__parent:hover {
@@ -313,97 +317,165 @@ p {
   font-size: 13px;
   font-weight: 400;
   color: var(--text-secondary);
-  margin: -4px 0 10px;
+  margin: 0 0 10px;
+  line-height: 1.4;
+  max-width: 40em;
 }
 
 .cat-list__subs {
   list-style: none;
   margin: 0;
-  padding: 0 0 4px 18px;
+  padding: 2px 0 2px 16px;
   border-left: 2px solid var(--border-soft);
-  margin-left: 4px;
+  margin-left: 2px;
 }
 
-.cat-list__subs a {
-  display: block;
-  padding: 7px 0 7px 12px;
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--text-secondary);
+.cat-list__sub {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 0 10px 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cat-list__sub:hover {
   text-decoration: none;
 }
 
-.cat-list__subs a:hover {
-  color: var(--ink);
+.cat-list__sub:hover .cat-list__sub-name {
   text-decoration: underline;
+  color: var(--ink);
 }
 
-.cat-list__subs a::before {
+.cat-list__sub-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.cat-list__sub-name::before {
   content: '• ';
   color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.cat-list__sub-desc {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  padding-left: 12px;
+  max-width: 40em;
 }
 
 .cat-list__empty {
   margin: 0;
-  padding: 4px 0 6px 18px;
+  padding: 4px 0 6px 16px;
   font-size: 13px;
   color: var(--text-tertiary);
 }
 
-.cat-list__actions {
-  margin-top: 6px;
-  padding-left: 18px;
+/* —— Topic list (example3 / example4) —— */
+.topic-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0 14px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
 }
 
-.cat-list__actions a {
-  font-size: 12px;
-  color: var(--text-tertiary);
+.topic-toolbar__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
-/* —— Subcategory / thread lists —— */
-.sub-list,
-.thread-list {
+.topic-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topic-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--border-soft);
 }
 
-.sub-list li,
-.thread-list li {
+.topic-list__item {
   border-bottom: 1px solid var(--border-soft);
 }
 
-.sub-list a,
-.thread-list a {
-  display: block;
+.topic-list__link {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
   padding: 16px 4px;
   color: inherit;
   text-decoration: none;
 }
 
-.sub-list a:hover,
-.thread-list a:hover {
-  background: #fafafa;
+.topic-list__link:hover {
   text-decoration: none;
+  background: #fafafa;
 }
 
-.sub-list__name,
-.thread-list__title {
-  font-size: 17px;
+.topic-list__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e8e8ed;
+  color: #6e6e73;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.topic-list__main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.topic-list__title {
+  font-size: 16px;
   font-weight: 400;
+  color: var(--text);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.topic-list__link:hover .topic-list__title {
   color: var(--ink);
-  margin-bottom: 4px;
 }
 
-.thread-list a:hover .thread-list__title {
-  text-decoration: underline;
-}
-
-.sub-list__meta,
-.thread-list__meta {
+.topic-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
   font-size: 12px;
   color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.topic-list__sep {
+  margin: 0 8px;
+  color: var(--border);
+}
+
+.topic-list__user {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* —— Thread detail —— */
@@ -594,7 +666,9 @@ p {
   border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .btn:hover {
