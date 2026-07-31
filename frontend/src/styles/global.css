@@ -733,7 +733,8 @@ p {
   align-items: center;
   gap: 10px;
   margin: 0 auto 28px;
-  max-width: 520px;
+  max-width: 640px;
+  width: 100%;
   justify-content: center;
 }
 
@@ -1206,11 +1207,10 @@ a.ad-pill--solid:hover {
   box-shadow: 0 0 0 3px rgba(45, 41, 40, 0.12);
 }
 
-/* Compact pill select (Community / topic) */
+/* Compact pill select (Community / topic) — full width, short height */
 .ask-select {
   position: relative;
   display: block;
-  max-width: 420px;
 }
 
 .ask-select__control {
