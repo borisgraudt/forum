@@ -343,7 +343,7 @@ p {
 }
 
 .cat-list__chip::before {
-  content: '• ';
+  content: '* ';
   color: var(--text-tertiary);
 }
 
