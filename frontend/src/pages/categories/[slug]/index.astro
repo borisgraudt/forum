@@ -3,7 +3,6 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import {
   ApiRequestError,
   authorLabel,
-  fakeViews,
   formatRelative,
   getCategory,
   getCookieHeader,
@@ -17,11 +16,15 @@ const { slug } = Astro.params;
 if (!slug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
+const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
+const limit = 20;
+const offset = (page - 1) * limit;
 
 let user: Awaited<ReturnType<typeof getMe>> = null;
 let category: Category | undefined;
 let children: Category[] = [];
 let threads: Thread[] = [];
+let total = 0;
 let error: string | null = null;
 
 try {
@@ -30,7 +33,9 @@ try {
   category = data.category;
   children = data.children ?? [];
   if (category.parent_id !== null || children.length === 0) {
-    threads = await listThreads(slug, cookie);
+    const list = await listThreads(slug, cookie, { limit, offset });
+    threads = list.threads;
+    total = list.total;
   }
 } catch (e) {
   if (e instanceof ApiRequestError && e.status === 404) {
@@ -42,6 +47,7 @@ try {
 
 const isRoot = category?.parent_id === null;
 const showSubs = isRoot && children.length > 0;
+const totalPages = Math.max(1, Math.ceil(total / limit));
 ---
 
 <BaseLayout title={category?.name ?? 'Forum'} user={user} active="browse">
@@ -74,7 +80,6 @@ const showSubs = isRoot && children.length > 0;
             <ul class="stat-list">
               {children.map((sub) => {
                 const topics = sub.topic_count ?? 0;
-                const views = fakeViews(sub.id);
                 return (
                   <li>
                     <a class="stat-list__row" href={`/categories/${sub.slug}`}>
@@ -86,10 +91,6 @@ const showSubs = isRoot && children.length > 0;
                         <span class="stat-list__stat" title="Topics">
                           <span class="stat-list__num">{topics}</span>
                           <span class="stat-list__label">{topics === 1 ? 'topic' : 'topics'}</span>
-                        </span>
-                        <span class="stat-list__stat" title="Views">
-                          <span class="stat-list__num">{views}</span>
-                          <span class="stat-list__label">views</span>
                         </span>
                       </span>
                     </a>
@@ -105,7 +106,7 @@ const showSubs = isRoot && children.length > 0;
               <span class="topic-toolbar__label">Thread</span>
               <div class="topic-toolbar__right">
                 <span class="topic-toolbar__hint">
-                  {threads.length} {threads.length === 1 ? 'topic' : 'topics'}
+                  {total} {total === 1 ? 'topic' : 'topics'}
                 </span>
                 {user ? (
                   <a class="btn btn-primary btn-sm" href={`/ask?category=${category.slug}`}>
@@ -130,45 +131,80 @@ const showSubs = isRoot && children.length > 0;
                 )}
               </div>
             ) : (
-              <ul class="topic-list topic-list--plain">
-                {threads.map((t) => {
-                  const who = authorLabel(t);
-                  const replies = Math.max(0, t.post_count - 1);
-                  const views = fakeViews(t.id);
-                  const activity = formatRelative(t.last_post_at || t.created_at);
-                  return (
-                    <li class="topic-list__item">
+              <>
+                <ul class="topic-list topic-list--plain">
+                  {threads.map((t) => {
+                    const who = authorLabel(t);
+                    const replies = Math.max(0, t.post_count - 1);
+                    const views = t.view_count ?? 0;
+                    const activity = formatRelative(t.last_post_at || t.created_at);
+                    return (
+                      <li class="topic-list__item">
+                        <a
+                          class="topic-list__link"
+                          href={`/categories/${category.slug}/threads/${t.slug}`}
+                        >
+                          <span class="topic-list__avatar" aria-hidden="true">
+                            {initials(who)}
+                          </span>
+                          <span class="topic-list__main">
+                            <span class="topic-list__title">
+                              {t.is_pinned && <span class="badge">Pinned</span>}
+                              {t.is_locked && <span class="badge badge--muted">Locked</span>}
+                              {t.title}
+                            </span>
+                            <span class="topic-list__meta">
+                              <span>Latest activity {activity}</span>
+                              <span class="topic-list__sep">·</span>
+                              <span>
+                                {replies} {replies === 1 ? 'reply' : 'replies'}
+                              </span>
+                              <span class="topic-list__sep">·</span>
+                              <span>{views} views</span>
+                              <span class="topic-list__sep">·</span>
+                              <span>
+                                asked by <span class="topic-list__user">{who}</span>
+                              </span>
+                            </span>
+                          </span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {totalPages > 1 && (
+                  <nav class="pager" aria-label="Pagination">
+                    {page > 1 ? (
                       <a
-                        class="topic-list__link"
-                        href={`/categories/${category.slug}/threads/${t.slug}`}
+                        class="btn btn-secondary btn-sm"
+                        href={`/categories/${category.slug}?page=${page - 1}`}
                       >
-                        <span class="topic-list__avatar" aria-hidden="true">
-                          {initials(who)}
-                        </span>
-                        <span class="topic-list__main">
-                          <span class="topic-list__title">
-                            {t.is_pinned && <span class="badge">Pinned</span>}
-                            {t.title}
-                          </span>
-                          <span class="topic-list__meta">
-                            <span>Latest activity {activity}</span>
-                            <span class="topic-list__sep">·</span>
-                            <span>
-                              {replies} {replies === 1 ? 'reply' : 'replies'}
-                            </span>
-                            <span class="topic-list__sep">·</span>
-                            <span>{views} views</span>
-                            <span class="topic-list__sep">·</span>
-                            <span>
-                              asked by <span class="topic-list__user">{who}</span>
-                            </span>
-                          </span>
-                        </span>
+                        Previous
                       </a>
-                    </li>
-                  );
-                })}
-              </ul>
+                    ) : (
+                      <span class="btn btn-secondary btn-sm" aria-disabled="true">
+                        Previous
+                      </span>
+                    )}
+                    <span class="pager__meta">
+                      Page {page} of {totalPages}
+                    </span>
+                    {page < totalPages ? (
+                      <a
+                        class="btn btn-secondary btn-sm"
+                        href={`/categories/${category.slug}?page=${page + 1}`}
+                      >
+                        Next
+                      </a>
+                    ) : (
+                      <span class="btn btn-secondary btn-sm" aria-disabled="true">
+                        Next
+                      </span>
+                    )}
+                  </nav>
+                )}
+              </>
             )}
           </>
         )}
