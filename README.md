@@ -105,62 +105,118 @@ Mutating requests need CSRF: cookie `csrf` + header `X-CSRF-Token`.
 
 ## Roadmap to v1.0.0
 
-### Done (through v0.2)
+Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community product** that feels as polished as Apple Discussions and can run a real niche forum in production (including stuff we used to call “optional”).
+
+### Done (through v0.2) — foundation
 - Auth, CRUD, category hierarchy
 - Apple-style Browse / Ask / Thread UI
 - Markdown, pagination, FTS search
 - CSRF, headers, rate limit, view counts
-- Basic mod actions (lock / pin / delete)
+- Basic mod (lock / pin / delete)
+- Basic responsive CSS (not yet a full mobile product)
 
-### v0.3 — Product depth
-- [ ] **Admin panel** (`/admin`): users, roles, reports, global settings
-- [ ] **Me too / Helpful** votes (real counts, not placeholders)
-- [ ] **Quote / reply-to** a specific post
-- [ ] **Edit own posts** (with history optional)
-- [ ] **User profiles** (public page, activity)
+### v0.3 — Community product core
+- [ ] **Admin panel** (`/admin`): users, roles, categories, reports, site settings
+- [ ] **Me too / Helpful** real votes + rankings
+- [ ] **Quote / reply-to** specific posts
+- [ ] **Edit / delete** own content (+ soft-delete, edit history)
+- [ ] **User profiles** (avatar, bio, activity, reputation)
+- [ ] **Drafts** for ask/reply
 
-### v0.4 — Trust & safety
-- [ ] **Report** content + mod queue
-- [ ] **Ban / mute** users
-- [ ] **Audit log** of mod actions
-- [ ] **Stricter rate limits** per endpoint (auth / post)
-- [ ] **Password reset** (email or admin-issued)
+### v0.4 — Trust, safety, identity
+- [ ] **Report** + mod queue
+- [ ] **Ban / mute / timeout** users
+- [ ] **Audit log** of every mod/admin action
+- [ ] Per-route **rate limits** (auth / post / search)
+- [ ] **Password reset** + email verification
+- [ ] **Mentions** (`@user`)
 
-### v0.5 — Content & media
-- [ ] **Attachments / images** (upload + size limits + scan)
-- [ ] **Avatars**
-- [ ] **Better markdown toolbar** (real formatting, not decorative)
-- [ ] **Drafts** (optional)
+### v0.5 — Media & composition
+- [ ] **Image / file attachments** (limits, MIME allowlist, virus scan hooks)
+- [ ] **Avatars** upload + defaults
+- [ ] **Real markdown toolbar** (bold/italic/list/link/code, not decorative)
+- [ ] **Embed previews** for safe links (optional toggle)
+- [ ] Clipboard paste images into posts
 
-### v0.6 — Discovery & UX
-- [ ] **Notifications** (replies, mentions)
-- [ ] **Watch / subscribe** thread or category
-- [ ] **Sort threads** (activity, newest, unanswered)
-- [ ] **“Solved” / accepted answer**
-- [ ] Mobile polish + empty/error states
+### v0.6 — Discovery, engagement, realtime
+- [ ] **Notifications** (in-app + email digests)
+- [ ] **Watch / subscribe** thread & category
+- [ ] **Sort / filters** (activity, newest, unanswered, solved)
+- [ ] **Solved / accepted answer**
+- [ ] **Realtime** updates (websockets or SSE: new replies, live counts)
+- [ ] **Unreads** badges
 
-### v0.7 — Ops / production
-- [ ] Reverse-proxy ready (HSTS, secure cookies by default in prod)
-- [ ] Backups story for SQLite (docs + script in Makefile or cron example)
-- [ ] Metrics / health depth (optional Prometheus)
-- [ ] Structured logging
-- [ ] E2E smoke tests in CI
+### v0.7 — Mobile + performance (first-class)
+- [ ] **Phone-first layout**: nav, forms, thread actions, tables → stacks
+- [ ] Touch targets ≥ 44px, safe-area insets, sticky composer on mobile
+- [ ] Responsive images / avatars (`srcset`), no horizontal scroll
+- [ ] PWA install shell (manifest + offline shell optional)
+- [ ] **Perf budget**: TTFB p95 &lt; 50ms local API; Lighthouse mobile Perf ≥ 90
+- [ ] HTTP cache headers for static; SSR data waterfalls eliminated
+- [ ] SQLite WAL + connection/pool tuning; optional read replica later
+- [ ] Bundle hygiene: almost zero client JS except progressive bits
 
-### v0.8–0.9 — Hardening
-- [ ] Full API docs (OpenAPI)
-- [ ] Seed / demo data command
-- [ ] Permission matrix review
-- [ ] Load test notes + defaults for small communities
-- [ ] i18n-ready strings (if you care about RU/EN)
+### v0.8 — Ops & multi-community scale
+- [ ] Production defaults: HSTS, Secure cookies, reverse-proxy recipes
+- [ ] **Backups** (SQLite snapshot + restore runbook)
+- [ ] Structured logs + metrics (Prometheus/OpenTelemetry)
+- [ ] E2E CI (Playwright) + load test baseline
+- [ ] **Multi-tenant / multi-site** mode (one binary, many communities)
+- [ ] OpenAPI for `/api/v1` + seed/demo command
+- [ ] i18n (RU/EN minimum)
 
-### v1.0.0 — “Ship it”
-- [ ] Feature freeze of the above core
-- [ ] Stable API versioning commitment for `/api/v1`
-- [ ] Release checklist + tagged `v1.0.0`
-- [ ] Known limitations documented in README
-- [ ] No critical open security issues
+### v0.9 — Polish & “cooler than NodeBB” bar
+- [ ] Design system tokens + dark mode
+- [ ] Full keyboard a11y + WCAG AA pass
+- [ ] Rich search (filters by author/category/date)
+- [ ] Import from Discourse / NodeBB (CSV/JSON tools)
+- [ ] Federation hooks *or* clean plugin API (pick one path)
+- [ ] Public status / health dashboard for ops
 
-**Not required for v1.0** (later): multi-tenant SaaS, realtime websockets, email digests, federation, full SPA rewrite.
+### v1.0.0 — Release bar (all of the above shipped)
+- [ ] Feature freeze of the full list above
+- [ ] Stable `/api/v1` compatibility promise
+- [ ] Security review (no critical/high open issues)
+- [ ] Mobile + desktop Lighthouse + real-device QA
+- [ ] Load test: documented numbers for N concurrent users on modest VPS
+- [ ] Tagged `v1.0.0` + release notes + upgrade path from 0.x
+
+**Post-v1.0 (nice later, not blocking 1.0):** full multi-region SaaS billing, ActivityPub federation if not chosen in 0.9, native apps.
+
+---
+
+## Mobile & speed — current status (honest)
+
+### Mobile (today)
+| Area | Status |
+|------|--------|
+| Viewport meta | yes |
+| Fluid layout / page rail | yes (`max-width` + padding) |
+| Some breakpoints | yes (~480 / 600 / 700 / 800px) — header, lists, thread |
+| Full phone UX | **partial** — works, not “app-like” |
+| Nav on small screens | may crowd (Ask / Browse / Search + avatar) |
+| Thread actions (pills) | wrap, but dense |
+| Forms (Ask/Search) | usable; not optimized for thumb |
+| Safe areas / bottom nav | **no** |
+| Touch target audit | **no** |
+| PWA | **no** |
+
+**Verdict:** desktop-first with responsive CSS. Fine for reading on phone; not yet a polished mobile product. That’s a first-class **v0.7** track for v1.0.
+
+### Speed (today)
+| Area | Status |
+|------|--------|
+| Backend | Rust + SQLite — inherently fast for small/medium communities |
+| SSR API hops | fixed `127.0.0.1` + parallel `Promise.all` on key pages |
+| Measured earlier | API ~0.5–1 ms; full SSR page ~10–15 ms local (dev) |
+| Production build | `cargo build --release` + Astro build — much better than `astro dev` |
+| Client JS | minimal by design (Astro) — good for mobile CPU |
+| Caching | almost none beyond browser defaults |
+| Images/CDN | N/A until attachments |
+| FTS search | local SQLite — fast for typical forum size |
+| Rate limit | in-memory (fine single-node) |
+
+**Verdict:** architecture is already **speed-friendly**. Bottlenecks later will be: N+1 if we get sloppy, big attachments, uncached SSR, and `astro dev` feeling “slow” in development. v1.0 needs a real **perf budget + load test** (v0.7–v0.8), not a rewrite.
 
 ---
 
