@@ -7,35 +7,42 @@ type Props = {
 };
 
 const { user = null, active = null } = Astro.props;
-const initial = user ? (user.display_name || user.username).slice(0, 1).toUpperCase() : null;
+const display = user ? user.display_name || user.username : '';
+const initial = display ? display.slice(0, 1).toUpperCase() : '';
 ---
 
 <header class="site-header">
   <div class="site-header__inner">
     <a class="brand" href="/">Community</a>
 
-    <nav class="nav-center" aria-label="Primary">
-      <a href="/ask" class:list={[{ 'is-active': active === 'ask' }]}>Ask the Community</a>
-      <a href="/" class:list={[{ 'is-active': active === 'browse' }]}>Browse</a>
-      <a href="/search" class:list={[{ 'is-active': active === 'search' }]}>Search</a>
-    </nav>
-
     <div class="nav-end">
+      <nav class="nav-links" aria-label="Primary">
+        <a href="/ask" class:list={[{ 'is-active': active === 'ask' }]}>Ask the Community</a>
+        <a href="/" class:list={[{ 'is-active': active === 'browse' }]}>Browse</a>
+        <a href="/search" class:list={[{ 'is-active': active === 'search' }]}>Search</a>
+      </nav>
+
       {
         user ? (
-          <>
-            <span class="muted" style="font-size:12px">
-              {user.display_name || user.username}
-            </span>
-            <form method="POST" action="/logout" style="margin:0">
-              <button class="btn btn-ghost btn-sm" type="submit">
-                Sign out
-              </button>
-            </form>
-            <span class="profile-btn" title={user.username} aria-hidden="true">
-              {initial}
-            </span>
-          </>
+          <details class="profile-menu">
+            <summary class="profile-menu__trigger" aria-label="Account menu">
+              <span class="profile-menu__name">{display}</span>
+              <span class="profile-btn" aria-hidden="true">
+                {initial}
+              </span>
+            </summary>
+            <div class="profile-menu__panel" role="menu">
+              <div class="profile-menu__who">
+                <span class="profile-menu__who-name">{display}</span>
+                <span class="profile-menu__who-user">@{user.username}</span>
+              </div>
+              <form method="POST" action="/logout" class="profile-menu__form">
+                <button type="submit" role="menuitem">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </details>
         ) : (
           <a class="profile-btn" href="/login" title="Sign in" aria-label="Sign in">
             <svg
@@ -55,3 +62,14 @@ const initial = user ? (user.display_name || user.username).slice(0, 1).toUpperC
     </div>
   </div>
 </header>
+
+<script>
+  // Close profile menu when clicking outside
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!(t instanceof Node)) return;
+    document.querySelectorAll('details.profile-menu[open]').forEach((el) => {
+      if (!el.contains(t)) el.removeAttribute('open');
+    });
+  });
+</script>

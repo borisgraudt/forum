@@ -1,22 +1,33 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import CommunityIcon from '../components/CommunityIcon.astro';
-import { getCookieHeader, getMe, listRootCategories } from '../lib/api';
+import { getCategory, getCookieHeader, getMe, listRootCategories } from '../lib/api';
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
 
-let categories: Category[] = [];
+type CommunityRow = {
+  root: Category;
+  children: Category[];
+};
+
+let rows: CommunityRow[] = [];
 let error: string | null = null;
+
 try {
-  categories = await listRootCategories(cookie);
+  const roots = await listRootCategories(cookie);
+  rows = await Promise.all(
+    roots.map(async (root) => {
+      const data = await getCategory(root.slug, cookie);
+      return { root, children: data.children ?? [] };
+    }),
+  );
 } catch (e) {
   error = e instanceof Error ? e.message : 'Could not load communities';
 }
 ---
 
-<BaseLayout title="Browse Communities" user={user} active="browse" wide>
+<BaseLayout title="Browse Communities" user={user} active="browse">
   <div class="browse-hero">
     <h1>Browse Communities</h1>
   </div>
@@ -24,7 +35,7 @@ try {
   {
     error ? (
       <div class="alert">{error}. Start the API on port 3000.</div>
-    ) : categories.length === 0 ? (
+    ) : rows.length === 0 ? (
       <div class="empty">
         <p>No communities yet.</p>
         {user ? (
@@ -40,26 +51,56 @@ try {
         )}
       </div>
     ) : (
-      <ul class="community-grid">
-        {categories.map((cat) => (
-          <li>
-            <a class="community-card" href={`/categories/${cat.slug}`}>
-              <CommunityIcon name={cat.name} />
-              <span class="community-card__label">{cat.name}</span>
+      <>
+        <div class="toolbar-row">
+          {user && (
+            <a class="btn btn-secondary btn-sm" href="/categories/new">
+              New community
             </a>
-          </li>
-        ))}
-      </ul>
-    )
-  }
+          )}
+        </div>
 
-  {
-    user && categories.length > 0 && (
-      <p style="margin-top:36px;text-align:center">
-        <a class="btn btn-secondary btn-sm" href="/categories/new">
-          New community
-        </a>
-      </p>
+        <ul class="cat-tree">
+          {rows.map(({ root, children }) => (
+            <li class="cat-tree__block">
+              <a class="cat-tree__root" href={`/categories/${root.slug}`}>
+                <span class="cat-tree__root-name">{root.name}</span>
+                {root.description && <span class="cat-tree__root-desc">{root.description}</span>}
+              </a>
+
+              {children.length > 0 ? (
+                <ul class="cat-tree__subs">
+                  {children.map((sub) => (
+                    <li>
+                      <a href={`/categories/${sub.slug}`}>
+                        <span class="cat-tree__bullet" aria-hidden="true">
+                          •
+                        </span>
+                        <span class="cat-tree__sub-main">
+                          <span class="cat-tree__sub-name">{sub.name}</span>
+                          {sub.description && (
+                            <span class="cat-tree__sub-desc">{sub.description}</span>
+                          )}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p class="cat-tree__empty-subs">
+                  No subcategories yet.
+                  {user && (
+                    <>
+                      {' '}
+                      <a href={`/categories/new?parent=${root.slug}`}>Add one</a>
+                    </>
+                  )}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </>
     )
   }
 </BaseLayout>
