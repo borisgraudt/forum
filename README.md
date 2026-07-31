@@ -136,14 +136,15 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for Git flow and PR rules.
 | Migrations | `make migrate` | SQLx + files in `backend/migrations/` |
 | Lint & format | `make lint` / `make fmt` | rustfmt, clippy `-D warnings`, Prettier, `astro check` |
 | Tests | `make test` | Unit + HTTP smoke tests on backend |
-| Package | `make package` | Portable tarball under `dist/` |
+| Package (tarball) | `make package` | Portable archive under `dist/` / Release **Assets** |
+| GitHub Packages | GHCR images on tag / `develop` | Repo **Packages** tab (`forum-backend`, `forum-frontend`) |
 | Docker | `make docker-up` | Compose profile `app` |
 | Git flow | `main` ← `develop` ← `feature/*` | Details in CONTRIBUTING |
 | CI | `.github/workflows/ci.yml` | fmt · clippy · test · frontend build · audit on every PR |
-| Release | tag `v*` → release workflow | Tarballs + GitHub Release |
+| Release | tag `v*` → release workflow | Tarballs + GHCR + GitHub Release |
 | Security | `make audit` | `cargo audit` + `npm audit --audit-level=high` |
 
-See **[docs/DEPLOY.md](./docs/DEPLOY.md)** for production env, Docker, and pre-releases.
+See **[docs/DEPLOY.md](./docs/DEPLOY.md)** for production env, Docker, **GitHub Packages**, and pre-releases.
 
 **Current version:** `0.1.0-alpha.1`
 

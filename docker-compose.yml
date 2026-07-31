@@ -14,7 +14,9 @@ services:
     profiles: ["app"]
     build:
       context: ./backend
-    image: forum-backend:local
+    # Override to pull from GitHub Packages, e.g.:
+    #   BACKEND_IMAGE=ghcr.io/borisgraudt/forum-backend:edge
+    image: ${BACKEND_IMAGE:-forum-backend:local}
     ports:
       - "3000:3000"
     environment:
@@ -42,7 +44,8 @@ services:
       context: ./frontend
       args:
         PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3000/api/v1}
-    image: forum-frontend:local
+    # Override: FRONTEND_IMAGE=ghcr.io/borisgraudt/forum-frontend:edge
+    image: ${FRONTEND_IMAGE:-forum-frontend:local}
     ports:
       - "4321:4321"
     environment:
