@@ -47,9 +47,8 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Audit
+        # Ignores configured in backend/.cargo/audit.toml (sqlx optional mysql→rsa).
         run: cargo audit
-        # Fail the job on known advisories; remove continue-on-error once deps settle.
-        continue-on-error: false
 
   frontend:
     name: Frontend (lint · build · audit)

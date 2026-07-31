@@ -1,0 +1,9 @@
+# cargo-audit config (used when running `cargo audit` from backend/)
+#
+# RUSTSEC-2023-0071 (rsa): sqlx keeps optional MySQL/Postgres packages in
+# Cargo.lock even when we only enable the `sqlite` feature. Those drivers are
+# not compiled or linked into forum-backend (verify with `cargo tree -i rsa`
+# / `cargo audit bin`). There is no fixed rsa release yet.
+
+[advisories]
+ignore = ["RUSTSEC-2023-0071"]
