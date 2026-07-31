@@ -3,7 +3,6 @@ import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import {
   ApiRequestError,
   authorLabel,
-  fakeViews,
   formatWhen,
   getCategory,
   getCookieHeader,
@@ -41,8 +40,10 @@ try {
 const formError = Astro.url.searchParams.get('error');
 const op = posts[0];
 const replies = posts.slice(1);
-const views = thread ? fakeViews(thread.id) : 0;
-const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
+const topReply = replies[0];
+const restReplies = replies.slice(1);
+const opAuthor = op ? authorLabel(op) : '';
+const replyHref = user ? '#reply' : '/login';
 ---
 
 <BaseLayout title={thread?.title ?? 'Topic'} user={user} active="browse">
@@ -51,53 +52,45 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
       <div class="alert">{error || 'Not found'}</div>
     ) : (
       <div class="ad-thread">
-        <nav class="ad-thread__nav" aria-label="Breadcrumb">
-          <a class="ad-thread__community" href={`/categories/${category.slug}`}>
-            {category.name}
-          </a>
-          <span class="ad-thread__meta-line">
-            <span>
-              {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
-            </span>
-            <span class="ad-thread__dot">·</span>
-            <span>{views} views</span>
-            {thread.is_locked && (
-              <>
-                <span class="ad-thread__dot">·</span>
-                <span>Locked</span>
-              </>
-            )}
-          </span>
-        </nav>
+        <a class="ad-thread__community" href={`/categories/${category.slug}`}>
+          {category.name}
+        </a>
 
-        {/* Original post — title lives inside the OP card, like Apple Discussions */}
+        {/* Original question — matches example5.png */}
         <article class="ad-post ad-post--op">
-          <aside class="ad-post__user">
+          <header class="ad-post__head">
             <div class="ad-post__avatar" aria-hidden="true">
-              {initials(authorLabel(op))}
+              {initials(opAuthor)}
             </div>
-            <div class="ad-post__identity">
-              <span class="ad-post__name">{authorLabel(op)}</span>
-              <span class="ad-post__role">Author</span>
+            <div class="ad-post__who">
+              <div class="ad-post__name-row">
+                <span class="ad-post__name">{opAuthor}</span>
+                <span class="ad-post__role">Author</span>
+              </div>
             </div>
-            <p class="ad-post__level">Member</p>
-          </aside>
+          </header>
 
-          <div class="ad-post__main">
-            <h1 class="ad-post__title">{thread.title}</h1>
-            <div class="ad-post__body">{op.body}</div>
-            <p class="ad-post__posted">Posted on {formatWhen(op.created_at)}</p>
-            <div class="ad-post__actions">
-              <button type="button" class="ad-post__action" disabled title="Coming soon">
+          <h1 class="ad-post__title">{thread.title}</h1>
+          <div class="ad-post__body">{op.body}</div>
+          <p class="ad-post__posted">Posted on {formatWhen(op.created_at)}</p>
+
+          <div class="ad-post__footer">
+            <div class="ad-post__actions" role="group" aria-label="Question actions">
+              <div class="ad-pill-group">
+                <button type="button" class="ad-pill" disabled title="Coming soon">
+                  <span class="ad-pill__icon" aria-hidden="true">↑</span>
+                  Helpful
+                </button>
+                <button type="button" class="ad-pill" disabled title="Coming soon">
+                  <span class="ad-pill__icon" aria-hidden="true">↓</span>
+                  Not helpful
+                </button>
+              </div>
+              <button type="button" class="ad-pill" disabled title="Coming soon">
                 Me too
               </button>
-              {!thread.is_locked && user && (
-                <a class="ad-post__action ad-post__action--primary" href="#reply">
-                  Reply
-                </a>
-              )}
-              {!thread.is_locked && !user && (
-                <a class="ad-post__action ad-post__action--primary" href="/login">
+              {!thread.is_locked && (
+                <a class="ad-pill ad-pill--solid" href={replyHref}>
                   Reply
                 </a>
               )}
@@ -105,46 +98,92 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
           </div>
         </article>
 
-        {/* Replies header */}
-        <div class="ad-replies__bar">
-          <h2 class="ad-replies__heading">
-            {replyCount === 0
-              ? 'No replies yet'
-              : `${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`}
-          </h2>
-          {replyCount > 0 && (
-            <span class="ad-replies__sort">
-              Sort By: <strong>Rank</strong>
-            </span>
-          )}
-        </div>
+        {/* Top-ranking reply card (first reply), then rest — example5/6 */}
+        {topReply && (
+          <article class="ad-post ad-post--featured">
+            <header class="ad-post__head">
+              <div class="ad-post__avatar" aria-hidden="true">
+                {initials(authorLabel(topReply))}
+              </div>
+              <div class="ad-post__who">
+                <div class="ad-post__name-row">
+                  <span class="ad-post__name">{authorLabel(topReply)}</span>
+                </div>
+              </div>
+              <span class="ad-post__badge">Top-ranking reply</span>
+            </header>
+
+            <p class="ad-post__posted ad-post__posted--inline">
+              Posted on {formatWhen(topReply.created_at)}
+            </p>
+            <div class="ad-post__body">{topReply.body}</div>
+
+            <div class="ad-post__footer">
+              <div class="ad-post__actions" role="group" aria-label="Reply actions">
+                <div class="ad-pill-group">
+                  <button type="button" class="ad-pill" disabled title="Coming soon">
+                    <span class="ad-pill__icon" aria-hidden="true">↑</span>
+                    Helpful
+                  </button>
+                  <button type="button" class="ad-pill" disabled title="Coming soon">
+                    <span class="ad-pill__icon" aria-hidden="true">↓</span>
+                    Not helpful
+                  </button>
+                </div>
+                {!thread.is_locked && (
+                  <a class="ad-pill" href={replyHref}>
+                    Reply
+                  </a>
+                )}
+              </div>
+            </div>
+          </article>
+        )}
 
         <section class="ad-replies" aria-label="Replies">
-          {replies.map((post) => {
+          {restReplies.map((post) => {
             const who = authorLabel(post);
             return (
               <article class="ad-post">
-                <aside class="ad-post__user">
+                <header class="ad-post__head">
                   <div class="ad-post__avatar" aria-hidden="true">
                     {initials(who)}
                   </div>
-                  <div class="ad-post__identity">
-                    <span class="ad-post__name">{who}</span>
+                  <div class="ad-post__who">
+                    <div class="ad-post__name-row">
+                      <span class="ad-post__name">{who}</span>
+                      {post.author_id === op.author_id && (
+                        <span class="ad-post__role">Author</span>
+                      )}
+                    </div>
                   </div>
-                  <p class="ad-post__level">Member</p>
-                </aside>
+                </header>
 
-                <div class="ad-post__main">
-                  <p class="ad-post__posted ad-post__posted--top">
-                    Posted on {formatWhen(post.created_at)}
-                  </p>
-                  <div class="ad-post__body">{post.body}</div>
-                  <div class="ad-post__actions">
-                    <button type="button" class="ad-post__action" disabled title="Coming soon">
-                      Helpful
-                    </button>
-                    {!thread.is_locked && user && (
-                      <a class="ad-post__action" href="#reply">
+                <p class="ad-post__posted ad-post__posted--inline">
+                  {formatWhen(post.created_at)}
+                  {opAuthor && (
+                    <>
+                      {' '}
+                      in response to {opAuthor}
+                    </>
+                  )}
+                </p>
+                <div class="ad-post__body">{post.body}</div>
+
+                <div class="ad-post__footer">
+                  <div class="ad-post__actions" role="group" aria-label="Reply actions">
+                    <div class="ad-pill-group">
+                      <button type="button" class="ad-pill" disabled title="Coming soon">
+                        <span class="ad-pill__icon" aria-hidden="true">↑</span>
+                        Helpful
+                      </button>
+                      <button type="button" class="ad-pill" disabled title="Coming soon">
+                        <span class="ad-pill__icon" aria-hidden="true">↓</span>
+                        Not helpful
+                      </button>
+                    </div>
+                    {!thread.is_locked && (
+                      <a class="ad-pill" href={replyHref}>
                         Reply
                       </a>
                     )}
@@ -155,7 +194,8 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
           })}
         </section>
 
-        {/* Reply composer */}
+        {replies.length === 0 && <div class="ad-empty">No replies yet.</div>}
+
         {thread.is_locked ? (
           <div class="ad-locked">This topic is locked.</div>
         ) : user ? (
@@ -167,14 +207,9 @@ const replyCount = Math.max(0, (thread?.post_count ?? 1) - 1);
               action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
             >
               <div class="ad-reply__box">
-                <aside class="ad-post__user ad-reply__user">
-                  <div class="ad-post__avatar" aria-hidden="true">
-                    {initials(user.display_name || user.username)}
-                  </div>
-                  <div class="ad-post__identity">
-                    <span class="ad-post__name">{user.display_name || user.username}</span>
-                  </div>
-                </aside>
+                <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
+                  {initials(user.display_name || user.username)}
+                </div>
                 <div class="ad-reply__editor-wrap">
                   <div class="ask-editor ad-reply__editor">
                     <textarea name="body" required maxlength="50000" placeholder="Write a reply…" />
