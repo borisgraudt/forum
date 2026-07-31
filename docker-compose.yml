@@ -1,0 +1,22 @@
+# Optional local stack helpers.
+# Primary DX is still `make dev` (native Rust + Astro).
+# SQLite lives as a file under backend/; no DB container required.
+
+services:
+  # Placeholder for future optional services (e.g. mailpit, minio).
+  # backend:
+  #   build: ./backend
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - ./backend/.env
+  #   volumes:
+  #     - ./backend/forum.db:/app/forum.db
+
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ["tools"]
+    ports:
+      - "8025:8025" # UI
+      - "1025:1025" # SMTP
+    restart: unless-stopped

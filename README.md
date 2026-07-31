@@ -40,35 +40,25 @@ Designed for niche communities that value speed, low resource usage, and strong 
 ## Project Structure
 
 ```text
-ultraforum/
+forum/
 ├── backend/                 # Rust + Axum API
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── config.rs
+│   │   ├── db.rs
 │   │   ├── error.rs
-│   │   ├── state.rs
-│   │   ├── db/
-│   │   ├── models/
-│   │   ├── dto/
-│   │   ├── handlers/
-│   │   ├── middleware/
-│   │   ├── services/
-│   │   └── utils/
+│   │   └── state.rs
 │   ├── migrations/
 │   └── Cargo.toml
 │
 ├── frontend/                # Astro
 │   ├── src/
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── layouts/
-│   │   ├── lib/
-│   │   └── styles/
 │   └── package.json
 │
-├── shared/
+├── .github/workflows/ci.yml
 ├── docker-compose.yml
 ├── Makefile
+├── CONTRIBUTING.md
 └── README.md
 ```
 
@@ -122,10 +112,30 @@ Frontend will be available at `http://localhost:4321`
 ### 4. Development with Makefile (recommended)
 
 ```bash
-make dev          # starts both backend and frontend
-make migrate      # run migrations
+make setup        # deps + .env
+make migrate      # apply SQLx migrations
+make dev          # cargo-watch backend + Astro HMR
+make lint         # rustfmt + clippy + frontend lint
+make test         # backend tests
 make build        # production build
+make audit        # cargo audit + npm audit
 ```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for Git flow and PR rules.
+
+---
+
+## Workflows
+
+| Workflow | Command / place | Notes |
+|----------|-----------------|-------|
+| Local development | `make dev` | Backend `:3000`, frontend `:4321` |
+| Migrations | `make migrate` | SQLx + files in `backend/migrations/` |
+| Lint & format | `make lint` / `make fmt` | rustfmt, clippy `-D warnings`, Prettier, `astro check` |
+| Tests | `make test` | Unit + HTTP smoke tests on backend |
+| Git flow | `main` ← `develop` ← `feature/*` | Details in CONTRIBUTING |
+| CI | `.github/workflows/ci.yml` | fmt · clippy · test · frontend build · audit on every PR |
+| Security | `make audit` | `cargo audit` + `npm audit --audit-level=high` |
 
 ---
 
