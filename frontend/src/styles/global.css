@@ -712,21 +712,58 @@ p {
   color: var(--text-secondary);
 }
 
+.search-page {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.search-page .page-title,
+.search-page .page-sub {
+  text-align: center;
+}
+
+.search-page .page-sub {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .search-form {
   display: flex;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 24px;
-  max-width: 640px;
+  margin: 0 auto 28px;
+  max-width: 520px;
+  justify-content: center;
 }
 
 .search-form .ask-input {
   flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 980px;
+  font-size: 14px;
+}
+
+.search-form .btn {
+  height: 40px;
+  padding: 0 18px;
+  flex-shrink: 0;
 }
 
 .search-meta {
   font-size: 13px;
   color: var(--text-secondary);
   margin-bottom: 16px;
+  text-align: left;
+}
+
+.search-page .search-list,
+.search-page .empty,
+.search-page .alert,
+.search-page .pager {
+  text-align: left;
 }
 
 .search-list {
@@ -1139,10 +1176,11 @@ a.ad-pill--solid:hover {
 .field select {
   width: 100%;
   font: inherit;
-  font-size: 15px;
-  padding: 13px 16px;
+  font-size: 14px;
+  height: 40px;
+  padding: 0 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 980px;
   background: #fff;
   color: var(--text);
   outline: none;
@@ -1168,10 +1206,11 @@ a.ad-pill--solid:hover {
   box-shadow: 0 0 0 3px rgba(45, 41, 40, 0.12);
 }
 
-/* Custom select — same surface as title/editor, muted placeholder */
+/* Compact pill select (Community / topic) */
 .ask-select {
   position: relative;
   display: block;
+  max-width: 420px;
 }
 
 .ask-select__control {
@@ -1179,11 +1218,12 @@ a.ad-pill--solid:hover {
   appearance: none;
   -webkit-appearance: none;
   font: inherit;
-  font-size: 15px;
-  line-height: 1.35;
-  padding: 13px 44px 13px 16px;
+  font-size: 14px;
+  line-height: 1.2;
+  height: 40px;
+  padding: 0 40px 0 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 980px;
   background: #fff;
   color: var(--text);
   outline: none;
@@ -1225,13 +1265,18 @@ a.ad-pill--solid:hover {
 
 .ask-select__chevron {
   position: absolute;
-  right: 16px;
+  right: 14px;
   top: 50%;
   transform: translateY(-50%);
   display: grid;
   place-items: center;
   color: var(--text-tertiary);
   pointer-events: none;
+}
+
+.ask-select__chevron svg {
+  width: 11px;
+  height: 7px;
 }
 
 .ask-select:focus-within .ask-select__chevron {
