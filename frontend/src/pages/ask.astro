@@ -1,6 +1,14 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCookieHeader, getMe, listChildren, listRootCategories } from '../lib/api';
+import CsrfInput from '../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  getCookieHeader,
+  getMe,
+  listChildren,
+  listRootCategories,
+} from '../lib/api';
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
@@ -11,12 +19,13 @@ if (!user) {
 
 const preselect = Astro.url.searchParams.get('category') || '';
 const error = Astro.url.searchParams.get('error');
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
 
 let roots: Category[] = [];
 let leaves: Category[] = [];
 try {
   roots = await listRootCategories(cookie);
-  // Collect postable targets: bare roots or their subcategories (parallel).
   const kidsByRoot = await Promise.all(
     roots.map(async (root) => {
       try {
@@ -44,7 +53,7 @@ try {
     <h1>Ask a question.</h1>
     <p>
       Questions for the community should include information such as your device, software version,
-      and an explanation of the issue.
+      and an explanation of the issue. Markdown is supported.
     </p>
   </section>
 
@@ -52,6 +61,7 @@ try {
     {error && <div class="alert">{error}</div>}
 
     <form method="POST" action="/api/ask">
+      <CsrfInput token={csrf.token} />
       <div class="ask-field">
         <label for="category">Community / topic</label>
         <div class="ask-select">
@@ -105,7 +115,7 @@ try {
           name="body"
           required
           maxlength="50000"
-          placeholder="Providing steps to reproduce the issue helps community members answer your question. If you share screenshots, please don’t include personal information."
+          placeholder="Markdown supported. Steps to reproduce help others answer. Don’t include personal information."
         ></textarea>
         <div class="ask-toolbar" aria-hidden="true">
           <span>B</span>
@@ -115,7 +125,7 @@ try {
           <span>•••</span>
         </div>
       </div>
-      <p class="ask-hint">✦ Title may be refined later. Review for accuracy.</p>
+      <p class="ask-hint">✦ Markdown is rendered safely. Review your title for accuracy.</p>
 
       <div class="ask-actions">
         <button class="btn btn-primary" type="submit">Continue</button>

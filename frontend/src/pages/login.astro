@@ -1,12 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCookieHeader, getMe } from '../lib/api';
+import CsrfInput from '../components/CsrfInput.astro';
+import { applySetCookies, ensureCsrf, getCookieHeader, getMe } from '../lib/api';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
 if (user) return Astro.redirect('/');
 
 const error = Astro.url.searchParams.get('error');
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
 ---
 
 <BaseLayout title="Sign in" user={null}>
@@ -14,6 +17,7 @@ const error = Astro.url.searchParams.get('error');
     <h1>Sign in</h1>
     <p class="lead">Welcome back to the community.</p>
     <form method="POST" action="/api/login">
+      <CsrfInput token={csrf.token} />
       {error && <div class="alert">{error}</div>}
       <div class="field">
         <label for="login">Username or email</label>

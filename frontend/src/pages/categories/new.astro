@@ -1,6 +1,13 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { getCookieHeader, getMe, listRootCategories } from '../../lib/api';
+import CsrfInput from '../../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  getCookieHeader,
+  getMe,
+  listRootCategories,
+} from '../../lib/api';
 import type { Category } from '../../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
@@ -9,6 +16,8 @@ if (!user) return Astro.redirect('/login');
 
 const parent = Astro.url.searchParams.get('parent') || '';
 const error = Astro.url.searchParams.get('error');
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
 
 let roots: Category[] = [];
 try {
@@ -31,6 +40,7 @@ try {
   {error && <div class="alert">{error}</div>}
 
   <form method="POST" action="/api/categories" style="max-width:480px">
+    <CsrfInput token={csrf.token} />
     {
       parent ? (
         <input type="hidden" name="parent_slug" value={parent} />
