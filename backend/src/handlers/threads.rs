@@ -2,14 +2,17 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
-use validator::Validate;
 
-use crate::dto::{CreateThreadRequest, ListQuery, ThreadListResponse, ThreadResponse};
-use crate::error::AppResult;
+use crate::dto::{
+    CreateThreadRequest, ListQuery, ThreadListResponse, ThreadResponse, UpdateThreadRequest,
+};
+use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
+use crate::models::{PostViewJson, UserRole};
 use crate::services::{CategoryService, ThreadService};
 use crate::state::AppState;
 use crate::utils::{slugify, validation_error};
+use validator::Validate;
 
 pub fn threads_router() -> Router<AppState> {
     Router::new()
@@ -19,7 +22,7 @@ pub fn threads_router() -> Router<AppState> {
         )
         .route(
             "/categories/{category_slug}/threads/{thread_slug}",
-            get(get_thread),
+            get(get_thread).patch(update_thread),
         )
 }
 
@@ -29,10 +32,20 @@ async fn list_threads(
     Query(query): Query<ListQuery>,
 ) -> AppResult<(StatusCode, Json<ThreadListResponse>)> {
     let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let limit = query.limit();
+    let offset = query.offset();
+    let total = ThreadService::count_by_category(&state.db, category.id).await?;
     let threads =
-        ThreadService::list_by_category(&state.db, category.id, query.limit(), query.offset())
-            .await?;
-    Ok((StatusCode::OK, Json(ThreadListResponse { threads })))
+        ThreadService::list_by_category(&state.db, category.id, limit, offset).await?;
+    Ok((
+        StatusCode::OK,
+        Json(ThreadListResponse {
+            threads,
+            total,
+            limit,
+            offset,
+        }),
+    ))
 }
 
 async fn get_thread(
@@ -40,6 +53,10 @@ async fn get_thread(
     Path((category_slug, thread_slug)): Path<(String, String)>,
 ) -> AppResult<(StatusCode, Json<ThreadResponse>)> {
     let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    // Count a view on each successful fetch.
+    ThreadService::increment_views(&state.db, thread.id).await?;
     let thread =
         ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
     Ok((
@@ -62,9 +79,7 @@ async fn create_thread(
     let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
     let title = body.title.trim().to_string();
     if title.is_empty() {
-        return Err(crate::error::AppError::BadRequest(
-            "title is required".into(),
-        ));
+        return Err(AppError::BadRequest("title is required".into()));
     }
 
     let slug = body
@@ -77,9 +92,7 @@ async fn create_thread(
 
     let body_text = body.body.trim().to_string();
     if body_text.is_empty() {
-        return Err(crate::error::AppError::BadRequest(
-            "body is required".into(),
-        ));
+        return Err(AppError::BadRequest("body is required".into()));
     }
 
     let (thread, first_post) = ThreadService::create_with_first_post(
@@ -96,7 +109,38 @@ async fn create_thread(
         StatusCode::CREATED,
         Json(ThreadResponse {
             thread,
-            first_post: Some(first_post),
+            first_post: Some(PostViewJson::from(first_post)),
         }),
     ))
+}
+
+async fn update_thread(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path((category_slug, thread_slug)): Path<(String, String)>,
+    Json(body): Json<UpdateThreadRequest>,
+) -> AppResult<(StatusCode, Json<ThreadResponse>)> {
+    require_moderator(&user)?;
+
+    let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+
+    let thread =
+        ThreadService::set_flags(&state.db, thread.id, body.is_locked, body.is_pinned).await?;
+
+    Ok((
+        StatusCode::OK,
+        Json(ThreadResponse {
+            thread,
+            first_post: None,
+        }),
+    ))
+}
+
+fn require_moderator(user: &crate::models::User) -> AppResult<()> {
+    match user.role_enum() {
+        Ok(UserRole::Moderator) | Ok(UserRole::Admin) => Ok(()),
+        _ => Err(AppError::Forbidden),
+    }
 }
