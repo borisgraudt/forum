@@ -7,11 +7,11 @@ use axum_extra::extract::CookieJar;
 use validator::Validate;
 
 use crate::dto::{AuthResponse, LoginRequest, RegisterRequest};
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::middleware::AuthUser;
 use crate::services::AuthService;
 use crate::state::AppState;
-use crate::utils::{clear_auth_cookie, set_auth_cookie};
+use crate::utils::{clear_auth_cookie, set_auth_cookie, validation_error};
 
 pub fn auth_router() -> Router<AppState> {
     Router::new()
@@ -19,23 +19,6 @@ pub fn auth_router() -> Router<AppState> {
         .route("/login", post(login))
         .route("/logout", post(logout))
         .route("/me", get(me))
-}
-
-fn validation_error(err: validator::ValidationErrors) -> AppError {
-    let message = err
-        .field_errors()
-        .iter()
-        .flat_map(|(field, errors)| {
-            errors.iter().map(move |e| {
-                e.message
-                    .as_ref()
-                    .map(|m| m.to_string())
-                    .unwrap_or_else(|| format!("invalid {field}"))
-            })
-        })
-        .next()
-        .unwrap_or_else(|| "validation failed".into());
-    AppError::BadRequest(message)
 }
 
 async fn register(

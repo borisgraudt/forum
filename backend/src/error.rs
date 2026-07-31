@@ -6,13 +6,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AppError {
-    // Reserved for CRUD handlers; keep variants stable for clients.
-    #[allow(dead_code)]
     #[error("not found")]
     NotFound,
     #[error("unauthorized")]
     Unauthorized,
-    #[allow(dead_code)]
     #[error("forbidden")]
     Forbidden,
     #[error("conflict: {0}")]
