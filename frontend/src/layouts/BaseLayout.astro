@@ -7,17 +7,10 @@ type Props = {
   title?: string;
   user?: UserPublic | null;
   active?: 'ask' | 'browse' | 'search' | null;
-  wide?: boolean;
   flush?: boolean;
 };
 
-const {
-  title = 'Community',
-  user = null,
-  active = null,
-  wide = false,
-  flush = false,
-} = Astro.props;
+const { title = 'Community', user = null, active = null, flush = false } = Astro.props;
 const pageTitle = title === 'Community' ? 'Community' : `${title} · Community`;
 ---
 
@@ -34,8 +27,16 @@ const pageTitle = title === 'Community' ? 'Community' : `${title} · Community`;
   </head>
   <body>
     <Header user={user} active={active} />
-    <main class:list={['main', { 'main--wide': wide, 'main--flush': flush }]}>
-      <slot />
-    </main>
+    {
+      flush ? (
+        <main class="main main--flush">
+          <slot />
+        </main>
+      ) : (
+        <main class="main page-rail">
+          <slot />
+        </main>
+      )
+    }
   </body>
 </html>

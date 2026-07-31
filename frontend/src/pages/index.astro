@@ -65,57 +65,36 @@ try {
           )}
         </div>
 
-        {/* NodeBB-style: parent category block + nested sub rows */}
-        <div class="forum-cats">
+        <ul class="cat-list">
           {rows.map(({ root, children }) => (
-            <section class="forum-cat">
-              <header class="forum-cat__header">
-                <div class="forum-cat__header-main">
-                  <h2 class="forum-cat__title">
-                    <a href={`/categories/${root.slug}`}>{root.name}</a>
-                  </h2>
-                  {root.description && <p class="forum-cat__desc">{root.description}</p>}
-                </div>
-                {user && (
-                  <a class="forum-cat__add" href={`/categories/new?parent=${root.slug}`}>
-                    + sub
-                  </a>
-                )}
-              </header>
+            <li>
+              <a class="cat-list__parent" href={`/categories/${root.slug}`}>
+                {root.name}
+              </a>
+              {root.description && <p class="cat-list__parent-desc">{root.description}</p>}
 
               {children.length > 0 ? (
-                <ul class="forum-cat__children">
+                <ul class="cat-list__subs">
                   {children.map((sub) => (
                     <li>
-                      <a class="forum-cat__child" href={`/categories/${sub.slug}`}>
-                        <span class="forum-cat__child-icon" aria-hidden="true" />
-                        <span class="forum-cat__child-body">
-                          <span class="forum-cat__child-name">{sub.name}</span>
-                          {sub.description && (
-                            <span class="forum-cat__child-desc">{sub.description}</span>
-                          )}
-                        </span>
-                        <span class="forum-cat__child-go" aria-hidden="true">
-                          →
-                        </span>
-                      </a>
+                      <a href={`/categories/${sub.slug}`}>{sub.name}</a>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p class="forum-cat__empty">
-                  No subcategories.
+                <p class="cat-list__empty">
+                  No subcategories
                   {user && (
                     <>
                       {' '}
-                      <a href={`/categories/new?parent=${root.slug}`}>Add one</a>
+                      · <a href={`/categories/new?parent=${root.slug}`}>add</a>
                     </>
                   )}
                 </p>
               )}
-            </section>
+            </li>
           ))}
-        </div>
+        </ul>
       </>
     )
   }
