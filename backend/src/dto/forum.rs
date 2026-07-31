@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::models::{Category, Post, Thread};
+use crate::models::{Category, PostView, ThreadView};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateCategoryRequest {
     #[validate(length(min = 1, max = 80, message = "name must be 1-80 characters"))]
     pub name: String,
 
-    /// Optional; auto-generated from name when omitted.
     #[validate(length(min = 1, max = 80, message = "slug must be 1-80 characters"))]
     pub slug: Option<String>,
 
@@ -16,6 +15,9 @@ pub struct CreateCategoryRequest {
     pub description: Option<String>,
 
     pub sort_order: Option<i64>,
+
+    /// When set, creates a subcategory under this parent slug.
+    pub parent_slug: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -23,11 +25,9 @@ pub struct CreateThreadRequest {
     #[validate(length(min = 1, max = 200, message = "title must be 1-200 characters"))]
     pub title: String,
 
-    /// Optional; auto-generated from title when omitted.
     #[validate(length(min = 1, max = 80, message = "slug must be 1-80 characters"))]
     pub slug: Option<String>,
 
-    /// First post body (required when creating a thread).
     #[validate(length(min = 1, max = 50_000, message = "body must be 1-50000 characters"))]
     pub body: String,
 }
@@ -57,6 +57,8 @@ impl ListQuery {
 #[derive(Debug, Serialize)]
 pub struct CategoryResponse {
     pub category: Category,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<Category>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -66,22 +68,22 @@ pub struct CategoryListResponse {
 
 #[derive(Debug, Serialize)]
 pub struct ThreadResponse {
-    pub thread: Thread,
+    pub thread: ThreadView,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub first_post: Option<Post>,
+    pub first_post: Option<PostView>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct ThreadListResponse {
-    pub threads: Vec<Thread>,
+    pub threads: Vec<ThreadView>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct PostResponse {
-    pub post: Post,
+    pub post: PostView,
 }
 
 #[derive(Debug, Serialize)]
 pub struct PostListResponse {
-    pub posts: Vec<Post>,
+    pub posts: Vec<PostView>,
 }

@@ -1,105 +1,128 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import {
+  ApiRequestError,
+  authorLabel,
   formatWhen,
   getCategory,
   getCookieHeader,
   getMe,
   listThreads,
-  ApiRequestError,
 } from '../../../lib/api';
 import type { Category, Thread } from '../../../lib/types';
 
 const { slug } = Astro.params;
-if (!slug) {
-  return Astro.redirect('/');
-}
+if (!slug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
 
 let category: Category | undefined;
+let children: Category[] = [];
 let threads: Thread[] = [];
 let error: string | null = null;
 
 try {
-  category = await getCategory(slug, cookie);
-  threads = await listThreads(slug, cookie);
+  const data = await getCategory(slug, cookie);
+  category = data.category;
+  children = data.children ?? [];
+  // Leaf (subcategory) or root without children → show threads here.
+  if (category.parent_id !== null || children.length === 0) {
+    threads = await listThreads(slug, cookie);
+  }
 } catch (e) {
   if (e instanceof ApiRequestError && e.status === 404) {
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
-  error = e instanceof Error ? e.message : 'Could not load topic';
+  error = e instanceof Error ? e.message : 'Could not load';
 }
+
+const isRoot = category?.parent_id === null;
+const showSubs = isRoot && children.length > 0;
 ---
 
-<BaseLayout title={category?.name ?? 'Topic'} user={user}>
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/">Community</a>
-    <span class="sep">/</span>
-    <span>{category?.name ?? slug}</span>
-  </nav>
-
+<BaseLayout title={category?.name ?? 'Community'} user={user} active="browse">
   {
     error || !category ? (
       <div class="alert">{error || 'Not found'}</div>
     ) : (
       <>
-        <section class="page-intro">
-          <h1>{category.name}</h1>
-          {category.description && <p>{category.description}</p>}
-        </section>
+        <nav class="breadcrumb">
+          <a href="/">Browse</a>
+          <span>/</span>
+          <span>{category.name}</span>
+        </nav>
 
-        <div class="toolbar">
-          {user ? (
-            <a class="btn btn-primary" href={`/categories/${category.slug}/new`}>
-              Ask a question
-            </a>
-          ) : (
-            <a class="btn btn-primary" href="/login">
-              Sign in to post
-            </a>
-          )}
-        </div>
+        <h1 class="page-title">{category.name}</h1>
+        {category.description && <p class="page-sub">{category.description}</p>}
 
-        <div class="panel">
-          <div class="panel__head">
-            <h2>Discussions</h2>
-          </div>
-          {threads.length === 0 ? (
-            <div class="empty">
-              No discussions yet.
+        {showSubs ? (
+          <>
+            <div class="toolbar-row">
               {user && (
-                <>
-                  {' '}
-                  <a href={`/categories/${category.slug}/new`}>Start one</a>.
-                </>
+                <a
+                  class="btn btn-secondary btn-sm"
+                  href={`/categories/new?parent=${category.slug}`}
+                >
+                  New subcategory
+                </a>
               )}
             </div>
-          ) : (
-            <ul class="list">
-              {threads.map((thread) => (
-                <li class="list-item">
-                  <a class="row" href={`/categories/${category.slug}/threads/${thread.slug}`}>
-                    <div class="row__main">
-                      <div class="row__title">
-                        {thread.is_pinned && <span class="badge">Pinned</span>}
-                        {thread.is_locked && <span class="badge">Locked</span>}
-                        {thread.title}
-                      </div>
-                      <div class="row__meta">
-                        {thread.post_count} {thread.post_count === 1 ? 'reply' : 'replies'}
-                      </div>
-                    </div>
-                    <div class="row__aside">
-                      {formatWhen(thread.last_post_at || thread.created_at)}
-                    </div>
+            <ul class="sub-list">
+              {children.map((sub) => (
+                <li>
+                  <a href={`/categories/${sub.slug}`}>
+                    <span class="sub-list__name">{sub.name}</span>
+                    <span class="sub-list__meta">{sub.description || 'View topics'}</span>
                   </a>
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+            {children.length === 0 && <div class="empty">No subcategories yet.</div>}
+          </>
+        ) : (
+          <>
+            <div class="toolbar-row">
+              {user ? (
+                <a class="btn btn-primary btn-sm" href={`/ask?category=${category.slug}`}>
+                  Ask a question
+                </a>
+              ) : (
+                <a class="btn btn-primary btn-sm" href="/login">
+                  Sign in to post
+                </a>
+              )}
+            </div>
+            {threads.length === 0 ? (
+              <div class="empty">
+                No topics yet.
+                {user && (
+                  <>
+                    {' '}
+                    <a href={`/ask?category=${category.slug}`}>Start one</a>.
+                  </>
+                )}
+              </div>
+            ) : (
+              <ul class="thread-list">
+                {threads.map((t) => (
+                  <li>
+                    <a href={`/categories/${category.slug}/threads/${t.slug}`}>
+                      <div class="thread-list__title">
+                        {t.is_pinned && <span class="badge">Pinned</span>}
+                        {t.title}
+                      </div>
+                      <div class="thread-list__meta">
+                        {authorLabel(t)} · {t.post_count} {t.post_count === 1 ? 'post' : 'posts'} ·{' '}
+                        {formatWhen(t.last_post_at || t.created_at)}
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </>
     )
   }

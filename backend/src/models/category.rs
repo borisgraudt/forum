@@ -8,6 +8,7 @@ pub struct Category {
     pub slug: String,
     pub description: Option<String>,
     pub sort_order: i64,
+    pub parent_id: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
 }

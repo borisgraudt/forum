@@ -4,41 +4,29 @@ import { getCookieHeader, getMe } from '../lib/api';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
-if (user) {
-  return Astro.redirect('/');
-}
+if (user) return Astro.redirect('/');
 
 const error = Astro.url.searchParams.get('error');
 ---
 
 <BaseLayout title="Sign in" user={null}>
-  <div class="auth-wrap">
-    <div class="panel">
-      <div class="panel__head">
-        <h1>Sign in</h1>
+  <div class="auth-card">
+    <h1>Sign in</h1>
+    <p class="lead">Welcome back to the community.</p>
+    <form method="POST" action="/api/login">
+      {error && <div class="alert">{error}</div>}
+      <div class="field">
+        <label for="login">Username or email</label>
+        <input id="login" name="login" required autocomplete="username" />
       </div>
-      <form class="form" method="POST" action="/api/login">
-        {error && <div class="alert">{error}</div>}
-        <div class="field">
-          <label for="login">Username or email</label>
-          <input id="login" name="login" type="text" required autocomplete="username" />
-        </div>
-        <div class="field">
-          <label for="password">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autocomplete="current-password"
-            minlength="8"
-          />
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-primary" type="submit">Sign in</button>
-          <span class="muted">No account? <a href="/register">Join</a></span>
-        </div>
-      </form>
-    </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required minlength="8" />
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Sign in</button>
+        <span class="muted">No account? <a href="/register">Join</a></span>
+      </div>
+    </form>
   </div>
 </BaseLayout>

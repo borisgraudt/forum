@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCookieHeader, getMe } from '../lib/api';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+---
+
+<BaseLayout title="Search" user={user} active="search">
+  <h1 class="page-title">Search</h1>
+  <p class="page-sub">Search is coming in a later release. Browse communities for now.</p>
+  <a class="btn btn-primary" href="/">Browse Communities</a>
+</BaseLayout>

@@ -14,7 +14,6 @@ export class ApiRequestError extends Error {
 type RequestOptions = {
   method?: string;
   body?: unknown;
-  /** Forward browser Cookie header when calling from Astro SSR. */
   cookie?: string | null;
 };
 
@@ -53,11 +52,8 @@ export function getCookieHeader(request: Request): string | null {
   return request.headers.get('cookie');
 }
 
-/** Merge Set-Cookie headers from API onto Astro response (SSR proxy for auth). */
 export function forwardSetCookies(from: Response, to: { headers: Headers }): void {
-  const anyHeaders = from.headers as Headers & {
-    getSetCookie?: () => string[];
-  };
+  const anyHeaders = from.headers as Headers & { getSetCookie?: () => string[] };
   const cookies =
     typeof anyHeaders.getSetCookie === 'function'
       ? anyHeaders.getSetCookie()
@@ -71,20 +67,33 @@ export function forwardSetCookies(from: Response, to: { headers: Headers }): voi
   }
 }
 
-export async function listCategories(cookie?: string | null) {
+export async function listRootCategories(cookie?: string | null) {
   const data = await request<{ categories: Category[] }>('/categories', { cookie });
   return data.categories;
 }
 
 export async function getCategory(slug: string, cookie?: string | null) {
-  const data = await request<{ category: Category }>(`/categories/${encodeURIComponent(slug)}`, {
-    cookie,
-  });
-  return data.category;
+  return request<{ category: Category; children?: Category[] }>(
+    `/categories/${encodeURIComponent(slug)}`,
+    { cookie },
+  );
+}
+
+export async function listChildren(slug: string, cookie?: string | null) {
+  const data = await request<{ categories: Category[] }>(
+    `/categories/${encodeURIComponent(slug)}/children`,
+    { cookie },
+  );
+  return data.categories;
 }
 
 export async function createCategory(
-  body: { name: string; description?: string; slug?: string },
+  body: {
+    name: string;
+    description?: string;
+    slug?: string;
+    parent_slug?: string;
+  },
   cookie?: string | null,
 ) {
   return request<{ category: Category }>('/categories', {
@@ -128,18 +137,6 @@ export async function listPosts(categorySlug: string, threadSlug: string, cookie
   return data.posts;
 }
 
-export async function createPost(
-  categorySlug: string,
-  threadSlug: string,
-  body: { body: string },
-  cookie?: string | null,
-) {
-  return request<{ post: Post }>(
-    `/categories/${encodeURIComponent(categorySlug)}/threads/${encodeURIComponent(threadSlug)}/posts`,
-    { method: 'POST', body, cookie },
-  );
-}
-
 export async function getMe(cookie?: string | null): Promise<UserPublic | null> {
   try {
     const data = await request<{ user: UserPublic }>('/auth/me', { cookie });
@@ -148,23 +145,6 @@ export async function getMe(cookie?: string | null): Promise<UserPublic | null> 
     if (err instanceof ApiRequestError && err.status === 401) return null;
     throw err;
   }
-}
-
-export async function login(body: { login: string; password: string }) {
-  return request<{ user: UserPublic }>('/auth/login', { method: 'POST', body });
-}
-
-export async function register(body: {
-  username: string;
-  email: string;
-  password: string;
-  display_name?: string;
-}) {
-  return request<{ user: UserPublic }>('/auth/register', { method: 'POST', body });
-}
-
-export async function logout() {
-  return request<{ ok: boolean }>('/auth/logout', { method: 'POST' });
 }
 
 export function formatWhen(iso: string | null | undefined): string {
@@ -178,4 +158,18 @@ export function formatWhen(iso: string | null | undefined): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+export function authorLabel(item: {
+  author_username?: string;
+  author_display_name?: string | null;
+}): string {
+  return item.author_display_name || item.author_username || 'Member';
+}
+
+export function initials(name: string): string {
+  const p = name.trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return '?';
+  if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
+  return (p[0][0] + p[1][0]).toUpperCase();
 }

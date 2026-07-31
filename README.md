@@ -176,18 +176,26 @@ CORS_ORIGIN=http://localhost:4321
 
 Cookie: `session` — httpOnly, SameSite=Lax, Secure when `COOKIE_SECURE=true`.
 
+### Forum hierarchy
+
+```text
+Community (root category)  →  Subcategory  →  Topic (thread)  →  Posts
+```
+
+UI matches Apple Discussions: **Browse** grid → subcategory list → topics → thread.
+
 ### Forum API
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/categories` | no | List categories |
-| GET | `/api/v1/categories/{slug}` | no | Get category |
-| POST | `/api/v1/categories` | yes | Create category |
-| GET | `/api/v1/categories/{slug}/threads` | no | List threads (`limit`/`offset`) |
-| GET | `/api/v1/categories/{c}/threads/{t}` | no | Get thread |
-| POST | `/api/v1/categories/{slug}/threads` | yes | Create thread + first post |
-| GET | `/api/v1/categories/{c}/threads/{t}/posts` | no | List posts |
-| POST | `/api/v1/categories/{c}/threads/{t}/posts` | yes | Reply (403 if locked) |
+| GET | `/api/v1/categories` | no | List **root** communities |
+| GET | `/api/v1/categories/{slug}` | no | Get category (+ `children` if root) |
+| GET | `/api/v1/categories/{slug}/children` | no | List subcategories |
+| POST | `/api/v1/categories` | yes | Create community or subcategory (`parent_slug`) |
+| GET | `/api/v1/categories/{slug}/threads` | no | List topics in a category |
+| GET | `/api/v1/categories/{c}/threads/{t}` | no | Get topic |
+| POST | `/api/v1/categories/{slug}/threads` | yes | Create topic + first post |
+| GET/POST | `.../posts` | reply needs auth | List / reply |
 
 ### Frontend (`.env`)
 

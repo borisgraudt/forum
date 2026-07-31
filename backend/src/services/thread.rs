@@ -1,7 +1,27 @@
 use sqlx::{SqlitePool, Transaction};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{Post, Thread};
+use crate::models::{Post, PostView, Thread, ThreadView};
+
+const THREAD_VIEW_SELECT: &str = r#"
+    SELECT
+        t.id, t.category_id, t.author_id, t.title, t.slug,
+        t.is_pinned, t.is_locked, t.post_count, t.last_post_at,
+        t.created_at, t.updated_at,
+        u.username AS author_username,
+        u.display_name AS author_display_name
+    FROM threads t
+    INNER JOIN users u ON u.id = t.author_id
+"#;
+
+const POST_VIEW_SELECT: &str = r#"
+    SELECT
+        p.id, p.thread_id, p.author_id, p.body, p.created_at, p.updated_at,
+        u.username AS author_username,
+        u.display_name AS author_display_name
+    FROM posts p
+    INNER JOIN users u ON u.id = p.author_id
+"#;
 
 pub struct ThreadService;
 
@@ -11,20 +31,19 @@ impl ThreadService {
         category_id: i64,
         limit: i64,
         offset: i64,
-    ) -> AppResult<Vec<Thread>> {
-        let rows = sqlx::query_as::<_, Thread>(
-            r#"
-            SELECT * FROM threads
-            WHERE category_id = ?
-            ORDER BY is_pinned DESC, COALESCE(last_post_at, created_at) DESC
-            LIMIT ? OFFSET ?
-            "#,
-        )
-        .bind(category_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(db)
-        .await?;
+    ) -> AppResult<Vec<ThreadView>> {
+        let sql = format!(
+            "{THREAD_VIEW_SELECT}
+            WHERE t.category_id = ?
+            ORDER BY t.is_pinned DESC, COALESCE(t.last_post_at, t.created_at) DESC
+            LIMIT ? OFFSET ?"
+        );
+        let rows = sqlx::query_as::<_, ThreadView>(&sql)
+            .bind(category_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(db)
+            .await?;
         Ok(rows)
     }
 
@@ -36,25 +55,41 @@ impl ThreadService {
             .ok_or(AppError::NotFound)
     }
 
+    pub async fn get_view_by_id(db: &SqlitePool, id: i64) -> AppResult<ThreadView> {
+        let sql = format!("{THREAD_VIEW_SELECT} WHERE t.id = ?");
+        sqlx::query_as::<_, ThreadView>(&sql)
+            .bind(id)
+            .fetch_optional(db)
+            .await?
+            .ok_or(AppError::NotFound)
+    }
+
     pub async fn get_by_category_and_slug(
         db: &SqlitePool,
         category_id: i64,
         slug: &str,
-    ) -> AppResult<Thread> {
-        sqlx::query_as::<_, Thread>(
-            r#"
-            SELECT * FROM threads
-            WHERE category_id = ? AND slug = ? COLLATE NOCASE
-            "#,
-        )
-        .bind(category_id)
-        .bind(slug)
-        .fetch_optional(db)
-        .await?
-        .ok_or(AppError::NotFound)
+    ) -> AppResult<ThreadView> {
+        let sql = format!(
+            "{THREAD_VIEW_SELECT}
+            WHERE t.category_id = ? AND t.slug = ? COLLATE NOCASE"
+        );
+        sqlx::query_as::<_, ThreadView>(&sql)
+            .bind(category_id)
+            .bind(slug)
+            .fetch_optional(db)
+            .await?
+            .ok_or(AppError::NotFound)
     }
 
-    /// Create a thread and its opening post in one transaction.
+    pub async fn get_post_view(db: &SqlitePool, post_id: i64) -> AppResult<PostView> {
+        let sql = format!("{POST_VIEW_SELECT} WHERE p.id = ?");
+        sqlx::query_as::<_, PostView>(&sql)
+            .bind(post_id)
+            .fetch_optional(db)
+            .await?
+            .ok_or(AppError::NotFound)
+    }
+
     pub async fn create_with_first_post(
         db: &SqlitePool,
         category_id: i64,
@@ -62,7 +97,7 @@ impl ThreadService {
         title: &str,
         slug: &str,
         body: &str,
-    ) -> AppResult<(Thread, Post)> {
+    ) -> AppResult<(ThreadView, PostView)> {
         let mut tx: Transaction<'_, sqlx::Sqlite> = db.begin().await?;
 
         let thread = sqlx::query_as::<_, Thread>(
@@ -100,22 +135,24 @@ impl ThreadService {
         .fetch_one(&mut *tx)
         .await?;
 
-        let thread = sqlx::query_as::<_, Thread>(
+        sqlx::query(
             r#"
             UPDATE threads
             SET post_count = 1,
                 last_post_at = ?,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             WHERE id = ?
-            RETURNING *
             "#,
         )
         .bind(&post.created_at)
         .bind(thread.id)
-        .fetch_one(&mut *tx)
+        .execute(&mut *tx)
         .await?;
 
         tx.commit().await?;
-        Ok((thread, post))
+
+        let thread = Self::get_view_by_id(db, thread.id).await?;
+        let first_post = Self::get_post_view(db, post.id).await?;
+        Ok((thread, first_post))
     }
 }

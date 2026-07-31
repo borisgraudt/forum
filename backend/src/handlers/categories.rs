@@ -13,14 +13,16 @@ use crate::utils::{slugify, validation_error};
 
 pub fn categories_router() -> Router<AppState> {
     Router::new()
-        .route("/", get(list_categories).post(create_category))
+        .route("/", get(list_root_categories).post(create_category))
         .route("/{slug}", get(get_category))
+        .route("/{slug}/children", get(list_children))
 }
 
-async fn list_categories(
+/// Top-level communities only (for Browse).
+async fn list_root_categories(
     State(state): State<AppState>,
 ) -> AppResult<(StatusCode, Json<CategoryListResponse>)> {
-    let categories = CategoryService::list(&state.db).await?;
+    let categories = CategoryService::list_roots(&state.db).await?;
     Ok((StatusCode::OK, Json(CategoryListResponse { categories })))
 }
 
@@ -29,7 +31,27 @@ async fn get_category(
     Path(slug): Path<String>,
 ) -> AppResult<(StatusCode, Json<CategoryResponse>)> {
     let category = CategoryService::get_by_slug(&state.db, &slug).await?;
-    Ok((StatusCode::OK, Json(CategoryResponse { category })))
+    let children = if category.parent_id.is_none() {
+        Some(CategoryService::list_children(&state.db, category.id).await?)
+    } else {
+        None
+    };
+    Ok((
+        StatusCode::OK,
+        Json(CategoryResponse {
+            category,
+            children,
+        }),
+    ))
+}
+
+async fn list_children(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+) -> AppResult<(StatusCode, Json<CategoryListResponse>)> {
+    let parent = CategoryService::get_by_slug(&state.db, &slug).await?;
+    let categories = CategoryService::list_children(&state.db, parent.id).await?;
+    Ok((StatusCode::OK, Json(CategoryListResponse { categories })))
 }
 
 async fn create_category(
@@ -41,9 +63,7 @@ async fn create_category(
 
     let name = body.name.trim().to_string();
     if name.is_empty() {
-        return Err(crate::error::AppError::BadRequest(
-            "name is required".into(),
-        ));
+        return Err(crate::error::AppError::BadRequest("name is required".into()));
     }
 
     let slug = body
@@ -63,9 +83,28 @@ async fn create_category(
 
     let sort_order = body.sort_order.unwrap_or(0);
 
-    let category =
-        CategoryService::create(&state.db, &name, &slug, description.as_deref(), sort_order)
-            .await?;
+    let parent_id = if let Some(ref parent_slug) = body.parent_slug {
+        let parent = CategoryService::get_by_slug(&state.db, parent_slug.trim()).await?;
+        Some(parent.id)
+    } else {
+        None
+    };
 
-    Ok((StatusCode::CREATED, Json(CategoryResponse { category })))
+    let category = CategoryService::create(
+        &state.db,
+        &name,
+        &slug,
+        description.as_deref(),
+        sort_order,
+        parent_id,
+    )
+    .await?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CategoryResponse {
+            category,
+            children: None,
+        }),
+    ))
 }

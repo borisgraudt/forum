@@ -4,59 +4,44 @@ import { getCookieHeader, getMe } from '../lib/api';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
-if (user) {
-  return Astro.redirect('/');
-}
+if (user) return Astro.redirect('/');
 
 const error = Astro.url.searchParams.get('error');
 ---
 
 <BaseLayout title="Join" user={null}>
-  <div class="auth-wrap">
-    <div class="panel">
-      <div class="panel__head">
-        <h1>Create account</h1>
+  <div class="auth-card">
+    <h1>Join</h1>
+    <p class="lead">Create an account to ask and answer.</p>
+    <form method="POST" action="/api/register">
+      {error && <div class="alert">{error}</div>}
+      <div class="field">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          name="username"
+          required
+          minlength="3"
+          maxlength="32"
+          pattern="[A-Za-z_][A-Za-z0-9_]{2,31}"
+        />
       </div>
-      <form class="form" method="POST" action="/api/register">
-        {error && <div class="alert">{error}</div>}
-        <div class="field">
-          <label for="username">Username</label>
-          <input
-            id="username"
-            name="username"
-            type="text"
-            required
-            minlength="3"
-            maxlength="32"
-            pattern="[A-Za-z_][A-Za-z0-9_]{2,31}"
-            autocomplete="username"
-          />
-        </div>
-        <div class="field">
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" required autocomplete="email" />
-        </div>
-        <div class="field">
-          <label for="display_name">Display name (optional)</label>
-          <input id="display_name" name="display_name" type="text" maxlength="64" />
-        </div>
-        <div class="field">
-          <label for="password">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minlength="8"
-            maxlength="128"
-            autocomplete="new-password"
-          />
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-primary" type="submit">Join</button>
-          <span class="muted">Already have an account? <a href="/login">Sign in</a></span>
-        </div>
-      </form>
-    </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required />
+      </div>
+      <div class="field">
+        <label for="display_name">Display name (optional)</label>
+        <input id="display_name" name="display_name" maxlength="64" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required minlength="8" />
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Join</button>
+        <span class="muted"><a href="/login">Sign in</a></span>
+      </div>
+    </form>
   </div>
 </BaseLayout>

@@ -2,19 +2,19 @@
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import {
   ApiRequestError,
+  authorLabel,
   formatWhen,
   getCategory,
   getCookieHeader,
   getMe,
   getThread,
+  initials,
   listPosts,
 } from '../../../../lib/api';
 import type { Category, Post, Thread } from '../../../../lib/types';
 
 const { slug, threadSlug } = Astro.params;
-if (!slug || !threadSlug) {
-  return Astro.redirect('/');
-}
+if (!slug || !threadSlug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
@@ -25,7 +25,8 @@ let posts: Post[] = [];
 let error: string | null = null;
 
 try {
-  category = await getCategory(slug, cookie);
+  const cat = await getCategory(slug, cookie);
+  category = cat.category;
   const t = await getThread(slug, threadSlug, cookie);
   thread = t.thread;
   posts = await listPosts(slug, threadSlug, cookie);
@@ -33,83 +34,78 @@ try {
   if (e instanceof ApiRequestError && e.status === 404) {
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
-  error = e instanceof Error ? e.message : 'Could not load discussion';
+  error = e instanceof Error ? e.message : 'Could not load thread';
 }
 
 const formError = Astro.url.searchParams.get('error');
 ---
 
-<BaseLayout title={thread?.title ?? 'Discussion'} user={user}>
+<BaseLayout title={thread?.title ?? 'Topic'} user={user} active="browse">
   {
     error || !category || !thread ? (
       <div class="alert">{error || 'Not found'}</div>
     ) : (
       <>
-        <nav class="breadcrumb" aria-label="Breadcrumb">
-          <a href="/">Community</a>
-          <span class="sep">/</span>
+        <nav class="breadcrumb">
+          <a href="/">Browse</a>
+          <span>/</span>
           <a href={`/categories/${category.slug}`}>{category.name}</a>
-          <span class="sep">/</span>
-          <span>{thread.title}</span>
+          <span>/</span>
+          <span>Topic</span>
         </nav>
 
-        <section class="page-intro">
-          <h1>
-            {thread.is_pinned && <span class="badge">Pinned</span>}
-            {thread.is_locked && <span class="badge">Locked</span>}
-            {thread.title}
-          </h1>
-          <p>
-            {thread.post_count} {thread.post_count === 1 ? 'post' : 'posts'}
-            {thread.last_post_at && <> · Last activity {formatWhen(thread.last_post_at)}</>}
-          </p>
-        </section>
+        <header class="thread-header">
+          <h1>{thread.title}</h1>
+          <div class="thread-header__meta">
+            {authorLabel(thread)} · {thread.post_count} {thread.post_count === 1 ? 'post' : 'posts'}
+            {thread.is_locked && ' · Locked'}
+          </div>
+        </header>
 
-        <div class="panel stack" style="gap:0">
-          {posts.map((post, i) => (
-            <article class="post">
-              <div class="post__meta">
-                <span class="post__author">#{i + 1}</span>
-                <span>{formatWhen(post.created_at)}</span>
+        {posts.map((post, i) => {
+          const who = authorLabel(post);
+          return (
+            <article class="post-block">
+              <div class="post-avatar">{initials(who)}</div>
+              <div class="post-body">
+                <div class="post-body__meta">
+                  <span class="post-body__author">{who}</span>
+                  <span>#{i + 1}</span>
+                  <span>{formatWhen(post.created_at)}</span>
+                </div>
+                <div class="post-body__text">{post.body}</div>
               </div>
-              <div class="post__body">{post.body}</div>
             </article>
-          ))}
-        </div>
-
-        <div style="height: 20px" />
+          );
+        })}
 
         {thread.is_locked ? (
-          <div class="panel">
-            <div class="empty">This discussion is locked.</div>
-          </div>
+          <div class="empty">This topic is locked.</div>
         ) : user ? (
-          <div class="panel">
-            <div class="panel__head">
-              <h2>Reply</h2>
+          <form
+            class="ask-body"
+            style="padding-inline:0;max-width:none"
+            method="POST"
+            action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
+          >
+            {formError && <div class="alert">{formError}</div>}
+            <div class="ask-editor">
+              <textarea name="body" required maxlength="50000" placeholder="Write a reply…" />
+              <div class="ask-toolbar">
+                <span>B</span>
+                <span>I</span>
+                <span>U</span>
+              </div>
             </div>
-            <form
-              class="form"
-              method="POST"
-              action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
-            >
-              {formError && <div class="alert">{formError}</div>}
-              <div class="field">
-                <label for="body">Your reply</label>
-                <textarea id="body" name="body" required maxlength="50000" />
-              </div>
-              <div class="form-actions">
-                <button class="btn btn-primary" type="submit">
-                  Post reply
-                </button>
-              </div>
-            </form>
-          </div>
+            <div class="ask-actions">
+              <button class="btn btn-primary" type="submit">
+                Post reply
+              </button>
+            </div>
+          </form>
         ) : (
-          <div class="panel">
-            <div class="empty">
-              <a href="/login">Sign in</a> to reply.
-            </div>
+          <div class="empty">
+            <a href="/login">Sign in</a> to reply.
           </div>
         )}
       </>

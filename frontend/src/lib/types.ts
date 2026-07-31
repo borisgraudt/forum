@@ -14,6 +14,7 @@ export type Category = {
   slug: string;
   description: string | null;
   sort_order: number;
+  parent_id: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -30,6 +31,8 @@ export type Thread = {
   last_post_at: string | null;
   created_at: string;
   updated_at: string;
+  author_username: string;
+  author_display_name: string | null;
 };
 
 export type Post = {
@@ -39,6 +42,8 @@ export type Post = {
   body: string;
   created_at: string;
   updated_at: string;
+  author_username: string;
+  author_display_name: string | null;
 };
 
 export type ApiError = {

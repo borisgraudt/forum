@@ -6,13 +6,29 @@ use crate::models::Category;
 pub struct CategoryService;
 
 impl CategoryService {
-    pub async fn list(db: &SqlitePool) -> AppResult<Vec<Category>> {
+    /// Top-level communities (parent_id IS NULL).
+    pub async fn list_roots(db: &SqlitePool) -> AppResult<Vec<Category>> {
         let rows = sqlx::query_as::<_, Category>(
             r#"
             SELECT * FROM categories
+            WHERE parent_id IS NULL
             ORDER BY sort_order ASC, name ASC
             "#,
         )
+        .fetch_all(db)
+        .await?;
+        Ok(rows)
+    }
+
+    pub async fn list_children(db: &SqlitePool, parent_id: i64) -> AppResult<Vec<Category>> {
+        let rows = sqlx::query_as::<_, Category>(
+            r#"
+            SELECT * FROM categories
+            WHERE parent_id = ?
+            ORDER BY sort_order ASC, name ASC
+            "#,
+        )
+        .bind(parent_id)
         .fetch_all(db)
         .await?;
         Ok(rows)
@@ -26,17 +42,31 @@ impl CategoryService {
             .ok_or(AppError::NotFound)
     }
 
+    pub async fn get_by_id(db: &SqlitePool, id: i64) -> AppResult<Category> {
+        sqlx::query_as::<_, Category>("SELECT * FROM categories WHERE id = ?")
+            .bind(id)
+            .fetch_optional(db)
+            .await?
+            .ok_or(AppError::NotFound)
+    }
+
     pub async fn create(
         db: &SqlitePool,
         name: &str,
         slug: &str,
         description: Option<&str>,
         sort_order: i64,
+        parent_id: Option<i64>,
     ) -> AppResult<Category> {
+        if let Some(pid) = parent_id {
+            // Ensure parent exists.
+            let _ = Self::get_by_id(db, pid).await?;
+        }
+
         let result = sqlx::query_as::<_, Category>(
             r#"
-            INSERT INTO categories (name, slug, description, sort_order)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO categories (name, slug, description, sort_order, parent_id)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING *
             "#,
         )
@@ -44,6 +74,7 @@ impl CategoryService {
         .bind(slug)
         .bind(description)
         .bind(sort_order)
+        .bind(parent_id)
         .fetch_one(db)
         .await;
 
