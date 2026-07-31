@@ -6,7 +6,7 @@ use crate::models::{Post, PostView, Thread, ThreadView};
 const THREAD_VIEW_SELECT: &str = r#"
     SELECT
         t.id, t.category_id, t.author_id, t.title, t.slug,
-        t.is_pinned, t.is_locked, t.post_count, t.last_post_at,
+        t.is_pinned, t.is_locked, t.post_count, t.view_count, t.last_post_at,
         t.created_at, t.updated_at,
         u.username AS author_username,
         u.display_name AS author_display_name
@@ -47,6 +47,16 @@ impl ThreadService {
         Ok(rows)
     }
 
+    pub async fn count_by_category(db: &SqlitePool, category_id: i64) -> AppResult<i64> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM threads WHERE category_id = ?",
+        )
+        .bind(category_id)
+        .fetch_one(db)
+        .await?;
+        Ok(count)
+    }
+
     pub async fn get_by_id(db: &SqlitePool, id: i64) -> AppResult<Thread> {
         sqlx::query_as::<_, Thread>("SELECT * FROM threads WHERE id = ?")
             .bind(id)
@@ -79,6 +89,65 @@ impl ThreadService {
             .fetch_optional(db)
             .await?
             .ok_or(AppError::NotFound)
+    }
+
+    pub async fn increment_views(db: &SqlitePool, thread_id: i64) -> AppResult<()> {
+        sqlx::query(
+            r#"
+            UPDATE threads
+            SET view_count = view_count + 1
+            WHERE id = ?
+            "#,
+        )
+        .bind(thread_id)
+        .execute(db)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn set_flags(
+        db: &SqlitePool,
+        thread_id: i64,
+        is_locked: Option<bool>,
+        is_pinned: Option<bool>,
+    ) -> AppResult<ThreadView> {
+        if is_locked.is_none() && is_pinned.is_none() {
+            return Err(AppError::BadRequest(
+                "is_locked or is_pinned is required".into(),
+            ));
+        }
+
+        if let Some(locked) = is_locked {
+            sqlx::query(
+                r#"
+                UPDATE threads
+                SET is_locked = ?,
+                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE id = ?
+                "#,
+            )
+            .bind(locked)
+            .bind(thread_id)
+            .execute(db)
+            .await?;
+        }
+
+        if let Some(pinned) = is_pinned {
+            sqlx::query(
+                r#"
+                UPDATE threads
+                SET is_pinned = ?,
+                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE id = ?
+                "#,
+            )
+            .bind(pinned)
+            .bind(thread_id)
+            .execute(db)
+            .await?;
+        }
+
+        Self::get_view_by_id(db, thread_id).await
     }
 
     pub async fn get_post_view(db: &SqlitePool, post_id: i64) -> AppResult<PostView> {
