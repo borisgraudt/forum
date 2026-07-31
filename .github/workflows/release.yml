@@ -154,28 +154,38 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
-          # List title: "forum v0.1.0" — strip pre-release (-alpha.1 etc.)
-          # Full tag (v0.1.0-alpha.1) still shown on the release detail page.
+          # List title like NodeBB: "v0.1.0" or "v0.1.0 (a.1)" for alpha.1
+          # Git tag stays full (v0.1.0-alpha.1) — visible when you open the release.
           BASE="${VERSION%%-*}"
           OWNER_LC="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
           if [[ "$VERSION" == *-* ]]; then
+            PRE="${VERSION#${BASE}-}"
+            # alpha.1 → a.1, beta.2 → b.2, rc.1 → rc.1
+            case "$PRE" in
+              alpha.*) SHORT="a.${PRE#alpha.}" ;;
+              beta.*)  SHORT="b.${PRE#beta.}" ;;
+              rc.*)    SHORT="rc.${PRE#rc.}" ;;
+              *)       SHORT="$PRE" ;;
+            esac
+            TITLE="v${BASE} (${SHORT})"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "pre_label=${VERSION#${BASE}-}" >> "$GITHUB_OUTPUT"
+            echo "pre_label=${PRE}" >> "$GITHUB_OUTPUT"
           else
+            TITLE="v${BASE}"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "pre_label=" >> "$GITHUB_OUTPUT"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "base=${BASE}" >> "$GITHUB_OUTPUT"
-          echo "title=forum v${BASE}" >> "$GITHUB_OUTPUT"
+          echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${OWNER_LC}/forum" >> "$GITHUB_OUTPUT"
 
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          # Shown in Releases list; tag v0.1.0-alpha.1 visible when you open the release.
+          # Releases list: "v0.1.0 (a.1)". Tag v0.1.0-alpha.1 on the detail page.
           name: ${{ steps.meta.outputs.title }}
           prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           generate_release_notes: true
@@ -185,7 +195,7 @@ jobs:
           body: |
             ## ${{ steps.meta.outputs.title }}
 
-            ${{ steps.meta.outputs.prerelease == 'true' && format('Pre-release channel: `{0}` (tag `{1}`)', steps.meta.outputs.version, steps.meta.outputs.tag) || 'Stable release.' }}
+            Tag: `${{ steps.meta.outputs.tag }}`
 
             ### GitHub Package
             Single package: **forum**
