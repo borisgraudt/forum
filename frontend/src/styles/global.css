@@ -9,10 +9,14 @@
   --text-tertiary: #86868b;
   --border: #d2d2d7;
   --border-soft: #e8e8ed;
-  --link: #0066cc;
-  --blue: #0071e3;
-  --blue-hover: #0077ed;
-  --blue-soft: #e8f0fe;
+  /* Primary accent (no blue) */
+  --ink: #2d2928;
+  --ink-hover: #1a1817;
+  --ink-soft: rgba(45, 41, 40, 0.08);
+  --link: #2d2928;
+  --blue: #2d2928;
+  --blue-hover: #1a1817;
+  --blue-soft: rgba(45, 41, 40, 0.08);
   --radius: 12px;
   --radius-pill: 980px;
   --max: 980px;
@@ -52,7 +56,7 @@ a:hover {
 }
 
 :focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -68,7 +72,7 @@ p {
   margin: 0;
 }
 
-/* —— Header: brand left · nav + profile right —— */
+/* —— Header: Apple-style — Community centered, actions right —— */
 .site-header {
   position: sticky;
   top: 0;
@@ -79,23 +83,28 @@ p {
 }
 
 .site-header__inner {
-  max-width: 1100px;
+  max-width: 1120px;
   margin: 0 auto;
   height: 100%;
-  padding: 0 22px;
-  display: flex;
+  padding: 0 28px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  gap: 12px;
+}
+
+.header-spacer {
+  min-width: 0;
 }
 
 .brand {
+  justify-self: center;
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text);
   text-decoration: none;
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .brand:hover {
@@ -105,16 +114,17 @@ p {
 }
 
 .nav-end {
+  justify-self: end;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   min-width: 0;
 }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   font-size: 12px;
 }
 
@@ -141,7 +151,7 @@ p {
   border-radius: 50%;
   border: 1px solid var(--border);
   background: #f5f5f7;
-  color: var(--text-secondary);
+  color: var(--ink);
   display: grid;
   place-items: center;
   text-decoration: none;
@@ -156,7 +166,7 @@ p {
   text-decoration: none;
 }
 
-/* Profile dropdown */
+/* Profile: nickname beside pfp, dropdown for sign out */
 .profile-menu {
   position: relative;
 }
@@ -165,9 +175,10 @@ p {
   list-style: none;
   cursor: pointer;
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 2px 2px 2px 10px;
+  padding: 2px 4px 2px 10px;
   border-radius: 999px;
   border: 1px solid transparent;
   transition:
@@ -189,11 +200,18 @@ p {
   border-color: var(--border-soft);
 }
 
+.profile-menu__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
 .profile-menu__name {
   font-size: 12px;
   font-weight: 500;
   color: var(--text);
-  max-width: 120px;
+  max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -290,33 +308,44 @@ p {
 
 .cat-tree__block {
   border-bottom: 1px solid var(--border-soft);
-  padding: 18px 0 14px;
+  padding: 16px 0 12px;
+}
+
+.cat-tree__root-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 6px;
 }
 
 .cat-tree__root {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--text);
   text-decoration: none;
-  padding: 2px 2px 10px;
 }
 
 .cat-tree__root:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.cat-tree__add {
+  font-size: 12px;
+  color: var(--text-tertiary);
   text-decoration: none;
+  white-space: nowrap;
 }
 
-.cat-tree__root:hover .cat-tree__root-name {
-  color: var(--link);
-}
-
-.cat-tree__root-name {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+.cat-tree__add:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }
 
 .cat-tree__root-desc {
+  margin: 0 2px 8px;
   font-size: 13px;
   color: var(--text-secondary);
 }
@@ -324,15 +353,15 @@ p {
 .cat-tree__subs {
   list-style: none;
   margin: 0;
-  padding: 0 0 4px 4px;
+  padding: 0 0 2px 6px;
 }
 
 .cat-tree__subs li a {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 9px 8px;
-  border-radius: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
   color: var(--text);
   text-decoration: none;
   transition: background 0.12s ease;
@@ -344,14 +373,14 @@ p {
 }
 
 .cat-tree__subs li a:hover .cat-tree__sub-name {
-  color: var(--link);
+  text-decoration: underline;
 }
 
 .cat-tree__bullet {
   color: var(--text-tertiary);
-  font-size: 14px;
-  line-height: 1.4;
-  width: 12px;
+  font-size: 15px;
+  line-height: 1.35;
+  width: 14px;
   flex-shrink: 0;
 }
 
@@ -365,6 +394,7 @@ p {
 .cat-tree__sub-name {
   font-size: 15px;
   font-weight: 400;
+  color: var(--text);
 }
 
 .cat-tree__sub-desc {
@@ -374,7 +404,7 @@ p {
 
 .cat-tree__empty-subs {
   margin: 0;
-  padding: 4px 8px 8px 22px;
+  padding: 2px 10px 6px 30px;
   font-size: 13px;
   color: var(--text-tertiary);
 }
@@ -654,8 +684,8 @@ p {
 
 .ask-field input:focus,
 .ask-field select:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.2);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(45, 41, 40, 0.15);
 }
 
 .ask-actions {
@@ -688,24 +718,24 @@ p {
 }
 
 .btn-primary {
-  background: var(--blue);
+  background: var(--ink);
   color: #fff;
 }
 
 .btn-primary:hover {
-  background: var(--blue-hover);
+  background: var(--ink-hover);
   color: #fff;
 }
 
 .btn-secondary {
   background: #fff;
-  color: var(--blue);
-  border: 1px solid var(--blue);
+  color: var(--ink);
+  border: 1px solid var(--ink);
 }
 
 .btn-secondary:hover {
-  background: var(--blue-soft);
-  color: var(--blue);
+  background: var(--ink-soft);
+  color: var(--ink);
 }
 
 .btn-ghost {
@@ -797,8 +827,8 @@ p {
 }
 
 .field input:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.18);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(45, 41, 40, 0.15);
 }
 
 .form-actions {
@@ -825,8 +855,8 @@ p {
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
-  color: var(--blue);
-  background: var(--blue-soft);
+  color: var(--ink);
+  background: var(--ink-soft);
   padding: 2px 8px;
   border-radius: 999px;
   margin-right: 6px;
@@ -836,6 +866,15 @@ p {
 @media (max-width: 700px) {
   .site-header__inner {
     padding: 0 14px;
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .header-spacer {
+    display: none;
+  }
+
+  .brand {
+    justify-self: start;
   }
 
   .nav-links {
@@ -844,15 +883,15 @@ p {
   }
 
   .profile-menu__name {
-    display: none;
+    max-width: 72px;
   }
 
   .browse-hero h1 {
     font-size: 28px;
   }
 
-  .cat-tree__root-name {
-    font-size: 18px;
+  .cat-tree__root {
+    font-size: 17px;
   }
 
   .ask-hero h1 {

@@ -12,10 +12,11 @@ use crate::state::AppState;
 use crate::utils::{slugify, validation_error};
 
 pub fn categories_router() -> Router<AppState> {
+    // Register `/children` before `/{slug}` so the path is not swallowed.
     Router::new()
         .route("/", get(list_root_categories).post(create_category))
-        .route("/{slug}", get(get_category))
         .route("/{slug}/children", get(list_children))
+        .route("/{slug}", get(get_category))
 }
 
 /// Top-level communities only (for Browse).
@@ -83,11 +84,17 @@ async fn create_category(
 
     let sort_order = body.sort_order.unwrap_or(0);
 
-    let parent_id = if let Some(ref parent_slug) = body.parent_slug {
-        let parent = CategoryService::get_by_slug(&state.db, parent_slug.trim()).await?;
-        Some(parent.id)
-    } else {
-        None
+    let parent_id = match body
+        .parent_slug
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(parent_slug) => {
+            let parent = CategoryService::get_by_slug(&state.db, parent_slug).await?;
+            Some(parent.id)
+        }
+        None => None,
     };
 
     let category = CategoryService::create(

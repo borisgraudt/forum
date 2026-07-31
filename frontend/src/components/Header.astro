@@ -13,6 +13,9 @@ const initial = display ? display.slice(0, 1).toUpperCase() : '';
 
 <header class="site-header">
   <div class="site-header__inner">
+    <!-- left spacer balances right cluster so "Community" sits like Apple (near center-left) -->
+    <div class="header-spacer" aria-hidden="true"></div>
+
     <a class="brand" href="/">Community</a>
 
     <div class="nav-end">
@@ -26,7 +29,9 @@ const initial = display ? display.slice(0, 1).toUpperCase() : '';
         user ? (
           <details class="profile-menu">
             <summary class="profile-menu__trigger" aria-label="Account menu">
-              <span class="profile-menu__name">{display}</span>
+              <span class="profile-menu__stack">
+                <span class="profile-menu__name">{display}</span>
+              </span>
               <span class="profile-btn" aria-hidden="true">
                 {initial}
               </span>
@@ -64,7 +69,6 @@ const initial = display ? display.slice(0, 1).toUpperCase() : '';
 </header>
 
 <script>
-  // Close profile menu when clicking outside
   document.addEventListener('click', (e) => {
     const t = e.target;
     if (!(t instanceof Node)) return;

@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCategory, getCookieHeader, getMe, listRootCategories } from '../lib/api';
+import { getCookieHeader, getMe, listChildren, listRootCategories } from '../lib/api';
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
@@ -18,8 +18,14 @@ try {
   const roots = await listRootCategories(cookie);
   rows = await Promise.all(
     roots.map(async (root) => {
-      const data = await getCategory(root.slug, cookie);
-      return { root, children: data.children ?? [] };
+      // Dedicated children endpoint (more reliable than nested payload)
+      let children: Category[] = [];
+      try {
+        children = await listChildren(root.slug, cookie);
+      } catch {
+        children = [];
+      }
+      return { root, children };
     }),
   );
 } catch (e) {
@@ -63,10 +69,17 @@ try {
         <ul class="cat-tree">
           {rows.map(({ root, children }) => (
             <li class="cat-tree__block">
-              <a class="cat-tree__root" href={`/categories/${root.slug}`}>
-                <span class="cat-tree__root-name">{root.name}</span>
-                {root.description && <span class="cat-tree__root-desc">{root.description}</span>}
-              </a>
+              <div class="cat-tree__root-row">
+                <a class="cat-tree__root" href={`/categories/${root.slug}`}>
+                  {root.name}
+                </a>
+                {user && (
+                  <a class="cat-tree__add" href={`/categories/new?parent=${root.slug}`}>
+                    + subcategory
+                  </a>
+                )}
+              </div>
+              {root.description && <p class="cat-tree__root-desc">{root.description}</p>}
 
               {children.length > 0 ? (
                 <ul class="cat-tree__subs">
@@ -87,15 +100,7 @@ try {
                   ))}
                 </ul>
               ) : (
-                <p class="cat-tree__empty-subs">
-                  No subcategories yet.
-                  {user && (
-                    <>
-                      {' '}
-                      <a href={`/categories/new?parent=${root.slug}`}>Add one</a>
-                    </>
-                  )}
-                </p>
+                <p class="cat-tree__empty-subs">No subcategories yet.</p>
               )}
             </li>
           ))}
