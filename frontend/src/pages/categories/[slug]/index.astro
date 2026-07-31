@@ -3,6 +3,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import {
   ApiRequestError,
   authorLabel,
+  fakeViews,
   formatRelative,
   getCategory,
   getCookieHeader,
@@ -27,7 +28,6 @@ try {
   const data = await getCategory(slug, cookie);
   category = data.category;
   children = data.children ?? [];
-  // Leaf (subcategory) or root without children → show threads here.
   if (category.parent_id !== null || children.length === 0) {
     threads = await listThreads(slug, cookie);
   }
@@ -69,15 +69,35 @@ const showSubs = isRoot && children.length > 0;
                 </a>
               )}
             </div>
-            <ul class="cat-list cat-list--flat">
-              {children.map((sub) => (
-                <li>
-                  <a class="cat-list__parent" href={`/categories/${sub.slug}`}>
-                    {sub.name}
-                  </a>
-                  {sub.description && <p class="cat-list__parent-desc">{sub.description}</p>}
-                </li>
-              ))}
+            <ul class="stat-list">
+              {children.map((sub) => {
+                const topics = sub.topic_count ?? 0;
+                const views = fakeViews(sub.id);
+                return (
+                  <li>
+                    <a class="stat-list__row" href={`/categories/${sub.slug}`}>
+                      <span class="stat-list__main">
+                        <span class="stat-list__title">{sub.name}</span>
+                        {sub.description && (
+                          <span class="stat-list__desc">{sub.description}</span>
+                        )}
+                      </span>
+                      <span class="stat-list__stats">
+                        <span class="stat-list__stat" title="Topics">
+                          <span class="stat-list__num">{topics}</span>
+                          <span class="stat-list__label">
+                            {topics === 1 ? 'topic' : 'topics'}
+                          </span>
+                        </span>
+                        <span class="stat-list__stat" title="Views">
+                          <span class="stat-list__num">{views}</span>
+                          <span class="stat-list__label">views</span>
+                        </span>
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
             {children.length === 0 && <div class="empty">No subcategories yet.</div>}
           </>
@@ -86,6 +106,9 @@ const showSubs = isRoot && children.length > 0;
             <div class="topic-toolbar">
               <span class="topic-toolbar__label">Thread</span>
               <div class="topic-toolbar__right">
+                <span class="topic-toolbar__hint">
+                  {threads.length} {threads.length === 1 ? 'topic' : 'topics'}
+                </span>
                 {user ? (
                   <a class="btn btn-primary btn-sm" href={`/ask?category=${category.slug}`}>
                     Ask a question
@@ -109,10 +132,11 @@ const showSubs = isRoot && children.length > 0;
                 )}
               </div>
             ) : (
-              <ul class="topic-list">
+              <ul class="topic-list topic-list--plain">
                 {threads.map((t) => {
                   const who = authorLabel(t);
                   const replies = Math.max(0, t.post_count - 1);
+                  const views = fakeViews(t.id);
                   const activity = formatRelative(t.last_post_at || t.created_at);
                   return (
                     <li class="topic-list__item">
@@ -136,8 +160,22 @@ const showSubs = isRoot && children.length > 0;
                             </span>
                             <span class="topic-list__sep">·</span>
                             <span>
+                              {views} views
+                            </span>
+                            <span class="topic-list__sep">·</span>
+                            <span>
                               asked by <span class="topic-list__user">{who}</span>
                             </span>
+                          </span>
+                        </span>
+                        <span class="topic-list__aside">
+                          <span class="stat-list__num">{views}</span>
+                          <span class="stat-list__label">views</span>
+                          <span class="stat-list__num" style="margin-top:6px">
+                            {t.post_count}
+                          </span>
+                          <span class="stat-list__label">
+                            {t.post_count === 1 ? 'post' : 'posts'}
                           </span>
                         </span>
                       </a>

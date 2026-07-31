@@ -10,7 +10,8 @@ impl CategoryService {
     pub async fn list_roots(db: &SqlitePool) -> AppResult<Vec<Category>> {
         let rows = sqlx::query_as::<_, Category>(
             r#"
-            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at
+            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at,
+                   (SELECT COUNT(*) FROM threads t WHERE t.category_id = categories.id) AS topic_count
             FROM categories
             WHERE parent_id IS NULL
             ORDER BY created_at ASC, id ASC
@@ -24,7 +25,8 @@ impl CategoryService {
     pub async fn list_children(db: &SqlitePool, parent_id: i64) -> AppResult<Vec<Category>> {
         let rows = sqlx::query_as::<_, Category>(
             r#"
-            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at
+            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at,
+                   (SELECT COUNT(*) FROM threads t WHERE t.category_id = categories.id) AS topic_count
             FROM categories
             WHERE parent_id = ?
             ORDER BY created_at ASC, id ASC
@@ -39,7 +41,8 @@ impl CategoryService {
     pub async fn get_by_slug(db: &SqlitePool, slug: &str) -> AppResult<Category> {
         sqlx::query_as::<_, Category>(
             r#"
-            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at
+            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at,
+                   (SELECT COUNT(*) FROM threads t WHERE t.category_id = categories.id) AS topic_count
             FROM categories
             WHERE slug = ? COLLATE NOCASE
             "#,
@@ -53,7 +56,8 @@ impl CategoryService {
     pub async fn get_by_id(db: &SqlitePool, id: i64) -> AppResult<Category> {
         sqlx::query_as::<_, Category>(
             r#"
-            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at
+            SELECT id, name, slug, description, sort_order, parent_id, created_at, updated_at,
+                   (SELECT COUNT(*) FROM threads t WHERE t.category_id = categories.id) AS topic_count
             FROM categories
             WHERE id = ?
             "#,

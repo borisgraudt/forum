@@ -191,3 +191,8 @@ export function initials(name: string): string {
   if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
   return (p[0][0] + p[1][0]).toUpperCase();
 }
+
+/** Deterministic placeholder views until we track real counters. */
+export function fakeViews(id: number): number {
+  return 12 + ((id * 37) % 480);
+}

@@ -11,4 +11,7 @@ pub struct Category {
     pub parent_id: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
+    /// Number of topics (threads) in this category. Defaults when not selected.
+    #[sqlx(default)]
+    pub topic_count: i64,
 }

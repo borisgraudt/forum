@@ -17,6 +17,7 @@ export type Category = {
   parent_id: number | null;
   created_at: string;
   updated_at: string;
+  topic_count?: number;
 };
 
 export type Thread = {
