@@ -1,12 +1,14 @@
 .PHONY: help dev dev-backend dev-frontend build lint lint-backend lint-frontend \
 	fmt fmt-check test test-backend migrate migrate-info db-create db-reset \
-	audit audit-backend audit-frontend clean setup ci
+	audit audit-backend audit-frontend clean setup ci \
+	package docker-build docker-up docker-down release-dry
 
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 BACKEND := $(ROOT)/backend
 FRONTEND := $(ROOT)/frontend
 
 export DATABASE_URL ?= sqlite:$(BACKEND)/forum.db?mode=rwc
+export VERSION ?= 0.1.0-alpha.1
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | \
@@ -36,6 +38,28 @@ dev-frontend: ## Frontend only (Astro HMR)
 build: ## Production build (backend + frontend)
 	cd $(BACKEND) && cargo build --release
 	cd $(FRONTEND) && npm run build
+
+package: ## Build portable tarball under dist/ (binary + UI + migrations)
+	chmod +x $(ROOT)/scripts/package.sh
+	VERSION=$(VERSION) $(ROOT)/scripts/package.sh
+
+docker-build: ## Build backend + frontend images
+	docker compose --profile app build
+
+docker-up: ## Run stack (profile app) on :3000 + :4321
+	docker compose --profile app up -d --build
+	@echo "API  http://localhost:3000/health"
+	@echo "UI   http://localhost:4321"
+
+docker-down: ## Stop compose app stack
+	docker compose --profile app down
+
+release-dry: ## Show how to cut a pre-release tag
+	@echo "1. Merge to develop/main"
+	@echo "2. git tag -a v$(VERSION) -m \"Forum v$(VERSION)\""
+	@echo "3. git push origin v$(VERSION)"
+	@echo "   → GitHub Actions builds packages + creates release"
+	@echo "Or local: make package && gh release create v$(VERSION) --prerelease dist/*.tar.gz dist/*.sha256"
 
 lint: lint-backend lint-frontend ## Run all linters
 
@@ -86,7 +110,8 @@ audit-frontend: ## npm audit (high+)
 
 clean: ## Remove build artifacts
 	cd $(BACKEND) && cargo clean
-	cd $(FRONTEND) && rm -rf dist .astro node_modules
+	cd $(FRONTEND) && rm -rf dist .astro
+	rm -rf $(ROOT)/dist
 	rm -f $(BACKEND)/forum.db $(BACKEND)/forum.db-*
 
 ci: fmt-check lint-backend test-backend audit-backend ## Local approximation of CI (backend-heavy)

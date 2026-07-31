@@ -1,22 +1,58 @@
-# Optional local stack helpers.
-# Primary DX is still `make dev` (native Rust + Astro).
-# SQLite lives as a file under backend/; no DB container required.
+# Local tools + production-ish stack.
+# Dev loop remains `make dev` (native). Use compose for smoke deploy.
 
 services:
-  # Placeholder for future optional services (e.g. mailpit, minio).
-  # backend:
-  #   build: ./backend
-  #   ports:
-  #     - "3000:3000"
-  #   env_file:
-  #     - ./backend/.env
-  #   volumes:
-  #     - ./backend/forum.db:/app/forum.db
-
   mailpit:
     image: axllent/mailpit:latest
     profiles: ["tools"]
     ports:
-      - "8025:8025" # UI
-      - "1025:1025" # SMTP
+      - "8025:8025"
+      - "1025:1025"
     restart: unless-stopped
+
+  backend:
+    profiles: ["app"]
+    build:
+      context: ./backend
+    image: forum-backend:local
+    ports:
+      - "3000:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: sqlite:/data/forum.db?mode=rwc
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-please}
+      JWT_TTL_SECS: ${JWT_TTL_SECS:-604800}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4321}
+      RUST_LOG: ${RUST_LOG:-info,forum_backend=info}
+    volumes:
+      - forum-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+      args:
+        PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3000/api/v1}
+    image: forum-frontend:local
+    ports:
+      - "4321:4321"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4321
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3000/api/v1}
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  forum-data:
