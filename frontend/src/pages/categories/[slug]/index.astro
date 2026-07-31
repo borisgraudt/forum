@@ -22,6 +22,7 @@ const offset = (page - 1) * limit;
 
 let user: Awaited<ReturnType<typeof getMe>> = null;
 let category: Category | undefined;
+let parent: Category | null = null;
 let children: Category[] = [];
 let threads: Thread[] = [];
 let total = 0;
@@ -31,6 +32,7 @@ try {
   const [me, data] = await Promise.all([getMe(cookie), getCategory(slug, cookie)]);
   user = me;
   category = data.category;
+  parent = data.parent ?? null;
   children = data.children ?? [];
   if (category.parent_id !== null || children.length === 0) {
     const list = await listThreads(slug, cookie, { limit, offset });
@@ -56,10 +58,16 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
       <div class="alert">{error || 'Not found'}</div>
     ) : (
       <>
-        <nav class="breadcrumb">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
           <a href="/">Browse</a>
-          <span>/</span>
-          <span>{category.name}</span>
+          {parent && (
+            <>
+              <span class="breadcrumb__sep">/</span>
+              <a href={`/categories/${parent.slug}`}>{parent.name}</a>
+            </>
+          )}
+          <span class="breadcrumb__sep">/</span>
+          <span aria-current="page">{category.name}</span>
         </nav>
 
         <h1 class="page-title">{category.name}</h1>

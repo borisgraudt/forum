@@ -24,6 +24,7 @@ const cookie = getCookieHeader(Astro.request);
 
 let user: Awaited<ReturnType<typeof getMe>> = null;
 let category: Category | undefined;
+let parent: Category | null = null;
 let thread: Thread | undefined;
 let posts: Post[] = [];
 let error: string | null = null;
@@ -40,6 +41,7 @@ try {
   ]);
   user = me;
   category = cat.category;
+  parent = cat.parent ?? null;
   thread = t.thread;
   posts = postList.posts;
   csrfToken = csrf.token;
@@ -81,9 +83,19 @@ function bodyHtml(post: Post) {
     ) : (
       <div class="ad-thread">
         <div class="ad-thread__top">
-          <a class="ad-thread__community" href={`/categories/${category.slug}`}>
-            {category.name}
-          </a>
+          <nav class="breadcrumb ad-thread__crumbs" aria-label="Breadcrumb">
+            <a href="/">Browse</a>
+            {parent && (
+              <>
+                <span class="breadcrumb__sep">/</span>
+                <a href={`/categories/${parent.slug}`}>{parent.name}</a>
+              </>
+            )}
+            <span class="breadcrumb__sep">/</span>
+            <a href={`/categories/${category.slug}`}>{category.name}</a>
+            <span class="breadcrumb__sep">/</span>
+            <span aria-current="page">{thread.title}</span>
+          </nav>
           <span class="ad-thread__views">{views} views</span>
         </div>
 

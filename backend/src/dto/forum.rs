@@ -83,6 +83,9 @@ pub struct CategoryResponse {
     pub category: Category,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<Category>>,
+    /// Parent community when this category is a subcategory.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<Category>,
 }
 
 #[derive(Debug, Serialize)]

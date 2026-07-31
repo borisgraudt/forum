@@ -1356,10 +1356,36 @@ a.ad-pill--solid:hover {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  min-width: 0;
 }
 
 .breadcrumb a {
   color: var(--ink);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.breadcrumb__sep {
+  color: var(--border);
+  user-select: none;
+}
+
+.breadcrumb [aria-current='page'] {
+  color: var(--text-secondary);
+  max-width: 28em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ad-thread__crumbs {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .alert {

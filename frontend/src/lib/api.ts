@@ -144,7 +144,7 @@ export async function listRootCategories(cookie?: string | null) {
 }
 
 export async function getCategory(slug: string, cookie?: string | null) {
-  return request<{ category: Category; children?: Category[] }>(
+  return request<{ category: Category; children?: Category[]; parent?: Category | null }>(
     `/categories/${encodeURIComponent(slug)}`,
     { cookie },
   );

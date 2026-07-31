@@ -37,11 +37,17 @@ async fn get_category(
     } else {
         None
     };
+    let parent = if let Some(parent_id) = category.parent_id {
+        Some(CategoryService::get_by_id(&state.db, parent_id).await?)
+    } else {
+        None
+    };
     Ok((
         StatusCode::OK,
         Json(CategoryResponse {
             category,
             children,
+            parent,
         }),
     ))
 }
@@ -112,6 +118,7 @@ async fn create_category(
         Json(CategoryResponse {
             category,
             children: None,
+            parent: None,
         }),
     ))
 }
