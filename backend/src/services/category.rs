@@ -64,6 +64,31 @@ impl CategoryService {
         .ok_or(AppError::NotFound)
     }
 
+    pub async fn slug_exists(db: &SqlitePool, slug: &str) -> AppResult<bool> {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM categories WHERE slug = ? COLLATE NOCASE",
+        )
+        .bind(slug)
+        .fetch_one(db)
+        .await?;
+        Ok(count > 0)
+    }
+
+    /// Ensure slug is unique: `base`, then `base-2`, `base-3`, …
+    pub async fn unique_slug(db: &SqlitePool, base: &str) -> AppResult<String> {
+        let base = if base.is_empty() { "category" } else { base };
+        if !Self::slug_exists(db, base).await? {
+            return Ok(base.to_string());
+        }
+        for n in 2..1000 {
+            let candidate = format!("{base}-{n}");
+            if !Self::slug_exists(db, &candidate).await? {
+                return Ok(candidate);
+            }
+        }
+        Err(AppError::Conflict("could not allocate unique category slug".into()))
+    }
+
     pub async fn create(
         db: &SqlitePool,
         name: &str,
@@ -77,6 +102,8 @@ impl CategoryService {
             let _ = Self::get_by_id(db, pid).await?;
         }
 
+        let slug = Self::unique_slug(db, slug).await?;
+
         let result = sqlx::query_as::<_, Category>(
             r#"
             INSERT INTO categories (name, slug, description, sort_order, parent_id)
@@ -85,7 +112,7 @@ impl CategoryService {
             "#,
         )
         .bind(name)
-        .bind(slug)
+        .bind(&slug)
         .bind(description)
         .bind(sort_order)
         .bind(parent_id)
