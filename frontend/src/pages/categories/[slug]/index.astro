@@ -1,105 +1,221 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import {
-  formatWhen,
+  ApiRequestError,
+  authorLabel,
+  formatRelative,
   getCategory,
   getCookieHeader,
   getMe,
+  initials,
   listThreads,
-  ApiRequestError,
 } from '../../../lib/api';
 import type { Category, Thread } from '../../../lib/types';
 
 const { slug } = Astro.params;
-if (!slug) {
-  return Astro.redirect('/');
-}
+if (!slug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
-const user = await getMe(cookie);
+const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
+const limit = 20;
+const offset = (page - 1) * limit;
 
+let user: Awaited<ReturnType<typeof getMe>> = null;
 let category: Category | undefined;
+let parent: Category | null = null;
+let children: Category[] = [];
 let threads: Thread[] = [];
+let total = 0;
 let error: string | null = null;
 
 try {
-  category = await getCategory(slug, cookie);
-  threads = await listThreads(slug, cookie);
+  const [me, data] = await Promise.all([getMe(cookie), getCategory(slug, cookie)]);
+  user = me;
+  category = data.category;
+  parent = data.parent ?? null;
+  children = data.children ?? [];
+  if (category.parent_id !== null || children.length === 0) {
+    const list = await listThreads(slug, cookie, { limit, offset });
+    threads = list.threads;
+    total = list.total;
+  }
 } catch (e) {
   if (e instanceof ApiRequestError && e.status === 404) {
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
-  error = e instanceof Error ? e.message : 'Could not load topic';
+  error = e instanceof Error ? e.message : 'Could not load';
+  if (!user) user = await getMe(cookie).catch(() => null);
 }
+
+const isRoot = category?.parent_id === null;
+const showSubs = isRoot && children.length > 0;
+const totalPages = Math.max(1, Math.ceil(total / limit));
 ---
 
-<BaseLayout title={category?.name ?? 'Topic'} user={user}>
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/">Community</a>
-    <span class="sep">/</span>
-    <span>{category?.name ?? slug}</span>
-  </nav>
-
+<BaseLayout title={category?.name ?? 'Forum'} user={user} active="browse">
   {
     error || !category ? (
       <div class="alert">{error || 'Not found'}</div>
     ) : (
       <>
-        <section class="page-intro">
-          <h1>{category.name}</h1>
-          {category.description && <p>{category.description}</p>}
-        </section>
-
-        <div class="toolbar">
-          {user ? (
-            <a class="btn btn-primary" href={`/categories/${category.slug}/new`}>
-              Ask a question
-            </a>
-          ) : (
-            <a class="btn btn-primary" href="/login">
-              Sign in to post
-            </a>
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="/">Browse</a>
+          {parent && (
+            <>
+              <span class="breadcrumb__sep">/</span>
+              <a href={`/categories/${parent.slug}`}>{parent.name}</a>
+            </>
           )}
-        </div>
+          <span class="breadcrumb__sep">/</span>
+          <span aria-current="page">{category.name}</span>
+        </nav>
 
-        <div class="panel">
-          <div class="panel__head">
-            <h2>Discussions</h2>
-          </div>
-          {threads.length === 0 ? (
-            <div class="empty">
-              No discussions yet.
+        <h1 class="page-title">{category.name}</h1>
+        {category.description && <p class="page-sub">{category.description}</p>}
+
+        {showSubs ? (
+          <>
+            <div class="toolbar-row">
               {user && (
-                <>
-                  {' '}
-                  <a href={`/categories/${category.slug}/new`}>Start one</a>.
-                </>
+                <a
+                  class="btn btn-secondary btn-sm"
+                  href={`/categories/new?parent=${category.slug}`}
+                >
+                  New subcategory
+                </a>
               )}
             </div>
-          ) : (
-            <ul class="list">
-              {threads.map((thread) => (
-                <li class="list-item">
-                  <a class="row" href={`/categories/${category.slug}/threads/${thread.slug}`}>
-                    <div class="row__main">
-                      <div class="row__title">
-                        {thread.is_pinned && <span class="badge">Pinned</span>}
-                        {thread.is_locked && <span class="badge">Locked</span>}
-                        {thread.title}
-                      </div>
-                      <div class="row__meta">
-                        {thread.post_count} {thread.post_count === 1 ? 'reply' : 'replies'}
-                      </div>
-                    </div>
-                    <div class="row__aside">
-                      {formatWhen(thread.last_post_at || thread.created_at)}
-                    </div>
-                  </a>
-                </li>
-              ))}
+            <ul class="stat-list">
+              {children.map((sub) => {
+                const topics = sub.topic_count ?? 0;
+                return (
+                  <li>
+                    <a class="stat-list__row" href={`/categories/${sub.slug}`}>
+                      <span class="stat-list__main">
+                        <span class="stat-list__title">{sub.name}</span>
+                        {sub.description && <span class="stat-list__desc">{sub.description}</span>}
+                      </span>
+                      <span class="stat-list__stats">
+                        <span class="stat-list__stat" title="Topics">
+                          <span class="stat-list__num">{topics}</span>
+                          <span class="stat-list__label">{topics === 1 ? 'topic' : 'topics'}</span>
+                        </span>
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
-          )}
-        </div>
+            {children.length === 0 && <div class="empty">No subcategories yet.</div>}
+          </>
+        ) : (
+          <>
+            <div class="topic-toolbar">
+              <span class="topic-toolbar__label">Thread</span>
+              <div class="topic-toolbar__right">
+                <span class="topic-toolbar__hint">
+                  {total} {total === 1 ? 'topic' : 'topics'}
+                </span>
+                {user ? (
+                  <a class="btn btn-primary btn-sm" href={`/ask?category=${category.slug}`}>
+                    Ask a question
+                  </a>
+                ) : (
+                  <a class="btn btn-primary btn-sm" href="/login">
+                    Sign in to post
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {threads.length === 0 ? (
+              <div class="empty">
+                No topics yet.
+                {user && (
+                  <>
+                    {' '}
+                    <a href={`/ask?category=${category.slug}`}>Start one</a>.
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <ul class="topic-list topic-list--plain">
+                  {threads.map((t) => {
+                    const who = authorLabel(t);
+                    const replies = Math.max(0, t.post_count - 1);
+                    const views = t.view_count ?? 0;
+                    const activity = formatRelative(t.last_post_at || t.created_at);
+                    return (
+                      <li class="topic-list__item">
+                        <a
+                          class="topic-list__link"
+                          href={`/categories/${category.slug}/threads/${t.slug}`}
+                        >
+                          <span class="topic-list__avatar" aria-hidden="true">
+                            {initials(who)}
+                          </span>
+                          <span class="topic-list__main">
+                            <span class="topic-list__title">
+                              {t.is_pinned && <span class="badge">Pinned</span>}
+                              {t.is_locked && <span class="badge badge--muted">Locked</span>}
+                              {t.title}
+                            </span>
+                            <span class="topic-list__meta">
+                              <span>Latest activity {activity}</span>
+                              <span class="topic-list__sep">·</span>
+                              <span>
+                                {replies} {replies === 1 ? 'reply' : 'replies'}
+                              </span>
+                              <span class="topic-list__sep">·</span>
+                              <span>{views} views</span>
+                              <span class="topic-list__sep">·</span>
+                              <span>
+                                asked by <span class="topic-list__user">{who}</span>
+                              </span>
+                            </span>
+                          </span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {totalPages > 1 && (
+                  <nav class="pager" aria-label="Pagination">
+                    {page > 1 ? (
+                      <a
+                        class="btn btn-secondary btn-sm"
+                        href={`/categories/${category.slug}?page=${page - 1}`}
+                      >
+                        Previous
+                      </a>
+                    ) : (
+                      <span class="btn btn-secondary btn-sm" aria-disabled="true">
+                        Previous
+                      </span>
+                    )}
+                    <span class="pager__meta">
+                      Page {page} of {totalPages}
+                    </span>
+                    {page < totalPages ? (
+                      <a
+                        class="btn btn-secondary btn-sm"
+                        href={`/categories/${category.slug}?page=${page + 1}`}
+                      >
+                        Next
+                      </a>
+                    ) : (
+                      <span class="btn btn-secondary btn-sm" aria-disabled="true">
+                        Next
+                      </span>
+                    )}
+                  </nav>
+                )}
+              </>
+            )}
+          </>
+        )}
       </>
     )
   }

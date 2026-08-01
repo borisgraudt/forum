@@ -1,118 +1,347 @@
 ---
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import CsrfInput from '../../../../components/CsrfInput.astro';
 import {
   ApiRequestError,
+  applySetCookies,
+  authorLabel,
+  ensureCsrf,
   formatWhen,
   getCategory,
   getCookieHeader,
   getMe,
-  getThread,
+  initials,
+  isModerator,
   listPosts,
+  getThread,
 } from '../../../../lib/api';
 import type { Category, Post, Thread } from '../../../../lib/types';
 
 const { slug, threadSlug } = Astro.params;
-if (!slug || !threadSlug) {
-  return Astro.redirect('/');
-}
+if (!slug || !threadSlug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
-const user = await getMe(cookie);
 
+let user: Awaited<ReturnType<typeof getMe>> = null;
 let category: Category | undefined;
+let parent: Category | null = null;
 let thread: Thread | undefined;
 let posts: Post[] = [];
 let error: string | null = null;
+let csrfToken = '';
 
 try {
-  category = await getCategory(slug, cookie);
-  const t = await getThread(slug, threadSlug, cookie);
+  const csrfP = ensureCsrf(cookie);
+  const [me, cat, t, postList, csrf] = await Promise.all([
+    getMe(cookie),
+    getCategory(slug, cookie),
+    getThread(slug, threadSlug, cookie),
+    listPosts(slug, threadSlug, cookie, { limit: 100 }),
+    csrfP,
+  ]);
+  user = me;
+  category = cat.category;
+  parent = cat.parent ?? null;
   thread = t.thread;
-  posts = await listPosts(slug, threadSlug, cookie);
+  posts = postList.posts;
+  csrfToken = csrf.token;
+  applySetCookies(Astro.response, csrf.setCookies);
 } catch (e) {
   if (e instanceof ApiRequestError && e.status === 404) {
     return new Response(null, { status: 404, statusText: 'Not Found' });
   }
-  error = e instanceof Error ? e.message : 'Could not load discussion';
+  error = e instanceof Error ? e.message : 'Could not load thread';
+  if (!user) user = await getMe(cookie).catch(() => null);
+  if (!csrfToken) {
+    const csrf = await ensureCsrf(cookie).catch(() => null);
+    if (csrf) {
+      csrfToken = csrf.token;
+      applySetCookies(Astro.response, csrf.setCookies);
+    }
+  }
 }
 
 const formError = Astro.url.searchParams.get('error');
+const op = posts[0];
+const replies = posts.slice(1);
+const topReply = replies[0];
+const restReplies = replies.slice(1);
+const opAuthor = op ? authorLabel(op) : '';
+const replyHref = user ? '#reply' : '/login';
+const canMod = isModerator(user);
+const views = thread?.view_count ?? 0;
+
+function bodyHtml(post: Post) {
+  return post.body_html || post.body;
+}
 ---
 
-<BaseLayout title={thread?.title ?? 'Discussion'} user={user}>
+<BaseLayout title={thread?.title ?? 'Topic'} user={user} active="browse">
   {
-    error || !category || !thread ? (
+    error || !category || !thread || !op ? (
       <div class="alert">{error || 'Not found'}</div>
     ) : (
-      <>
-        <nav class="breadcrumb" aria-label="Breadcrumb">
-          <a href="/">Community</a>
-          <span class="sep">/</span>
-          <a href={`/categories/${category.slug}`}>{category.name}</a>
-          <span class="sep">/</span>
-          <span>{thread.title}</span>
-        </nav>
-
-        <section class="page-intro">
-          <h1>
-            {thread.is_pinned && <span class="badge">Pinned</span>}
-            {thread.is_locked && <span class="badge">Locked</span>}
-            {thread.title}
-          </h1>
-          <p>
-            {thread.post_count} {thread.post_count === 1 ? 'post' : 'posts'}
-            {thread.last_post_at && <> · Last activity {formatWhen(thread.last_post_at)}</>}
-          </p>
-        </section>
-
-        <div class="panel stack" style="gap:0">
-          {posts.map((post, i) => (
-            <article class="post">
-              <div class="post__meta">
-                <span class="post__author">#{i + 1}</span>
-                <span>{formatWhen(post.created_at)}</span>
-              </div>
-              <div class="post__body">{post.body}</div>
-            </article>
-          ))}
+      <div class="ad-thread">
+        <div class="ad-thread__top">
+          <nav class="breadcrumb ad-thread__crumbs" aria-label="Breadcrumb">
+            <a href="/">Browse</a>
+            {parent && (
+              <>
+                <span class="breadcrumb__sep">/</span>
+                <a href={`/categories/${parent.slug}`}>{parent.name}</a>
+              </>
+            )}
+            <span class="breadcrumb__sep">/</span>
+            <a href={`/categories/${category.slug}`}>{category.name}</a>
+            <span class="breadcrumb__sep">/</span>
+            <span aria-current="page">{thread.title}</span>
+          </nav>
+          <span class="ad-thread__views">{views} views</span>
         </div>
 
-        <div style="height: 20px" />
+        {canMod && (
+          <div class="mod-bar">
+            <form
+              method="POST"
+              action={`/api/categories/${category.slug}/threads/${thread.slug}/mod`}
+              class="mod-bar__form"
+            >
+              <CsrfInput token={csrfToken} />
+              {thread.is_locked ? (
+                <button class="btn btn-secondary btn-sm" name="action" value="unlock" type="submit">
+                  Unlock
+                </button>
+              ) : (
+                <button class="btn btn-secondary btn-sm" name="action" value="lock" type="submit">
+                  Lock
+                </button>
+              )}
+              {thread.is_pinned ? (
+                <button class="btn btn-secondary btn-sm" name="action" value="unpin" type="submit">
+                  Unpin
+                </button>
+              ) : (
+                <button class="btn btn-secondary btn-sm" name="action" value="pin" type="submit">
+                  Pin
+                </button>
+              )}
+            </form>
+          </div>
+        )}
+
+        {formError && <div class="alert">{formError}</div>}
+
+        <article class="ad-post ad-post--op">
+          <header class="ad-post__head">
+            <div class="ad-post__avatar" aria-hidden="true">
+              {initials(opAuthor)}
+            </div>
+            <div class="ad-post__who">
+              <div class="ad-post__name-row">
+                <span class="ad-post__name">{opAuthor}</span>
+                <span class="ad-post__role">Author</span>
+              </div>
+            </div>
+          </header>
+
+          <h1 class="ad-post__title">{thread.title}</h1>
+          <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
+          <p class="ad-post__posted">Posted on {formatWhen(op.created_at)}</p>
+
+          <div class="ad-post__footer">
+            <div class="ad-post__actions" role="group" aria-label="Question actions">
+              <div class="ad-pill-group">
+                <button type="button" class="ad-pill" disabled title="Coming soon">
+                  <span class="ad-pill__icon" aria-hidden="true">
+                    ↑
+                  </span>
+                  Helpful
+                </button>
+                <button type="button" class="ad-pill" disabled title="Coming soon">
+                  <span class="ad-pill__icon" aria-hidden="true">
+                    ↓
+                  </span>
+                  Not helpful
+                </button>
+              </div>
+              <button type="button" class="ad-pill" disabled title="Coming soon">
+                Me too
+              </button>
+              {!thread.is_locked && (
+                <a class="ad-pill ad-pill--solid" href={replyHref}>
+                  Reply
+                </a>
+              )}
+            </div>
+          </div>
+        </article>
+
+        {topReply && (
+          <article class="ad-post ad-post--featured">
+            <header class="ad-post__head">
+              <div class="ad-post__avatar" aria-hidden="true">
+                {initials(authorLabel(topReply))}
+              </div>
+              <div class="ad-post__who">
+                <div class="ad-post__name-row">
+                  <span class="ad-post__name">{authorLabel(topReply)}</span>
+                </div>
+              </div>
+              <span class="ad-post__badge">Top-ranking reply</span>
+            </header>
+
+            <p class="ad-post__posted ad-post__posted--inline">
+              Posted on {formatWhen(topReply.created_at)}
+            </p>
+            <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
+
+            <div class="ad-post__footer">
+              <div class="ad-post__actions" role="group" aria-label="Reply actions">
+                <div class="ad-pill-group">
+                  <button type="button" class="ad-pill" disabled title="Coming soon">
+                    <span class="ad-pill__icon" aria-hidden="true">
+                      ↑
+                    </span>
+                    Helpful
+                  </button>
+                  <button type="button" class="ad-pill" disabled title="Coming soon">
+                    <span class="ad-pill__icon" aria-hidden="true">
+                      ↓
+                    </span>
+                    Not helpful
+                  </button>
+                </div>
+                {!thread.is_locked && (
+                  <a class="ad-pill" href={replyHref}>
+                    Reply
+                  </a>
+                )}
+                {(canMod || (user && user.id === topReply.author_id)) && (
+                  <form
+                    method="POST"
+                    action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${topReply.id}`}
+                    class="inline-form"
+                  >
+                    <CsrfInput token={csrfToken} />
+                    <button type="submit" class="ad-pill ad-pill--danger">
+                      Delete
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          </article>
+        )}
+
+        <section class="ad-replies" aria-label="Replies">
+          {restReplies.map((post) => {
+            const who = authorLabel(post);
+            const canDelete = canMod || (user && user.id === post.author_id);
+            return (
+              <article class="ad-post">
+                <header class="ad-post__head">
+                  <div class="ad-post__avatar" aria-hidden="true">
+                    {initials(who)}
+                  </div>
+                  <div class="ad-post__who">
+                    <div class="ad-post__name-row">
+                      <span class="ad-post__name">{who}</span>
+                      {post.author_id === op.author_id && <span class="ad-post__role">Author</span>}
+                    </div>
+                  </div>
+                </header>
+
+                <p class="ad-post__posted ad-post__posted--inline">
+                  {formatWhen(post.created_at)}
+                  {opAuthor && <> in response to {opAuthor}</>}
+                </p>
+                <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
+
+                <div class="ad-post__footer">
+                  <div class="ad-post__actions" role="group" aria-label="Reply actions">
+                    <div class="ad-pill-group">
+                      <button type="button" class="ad-pill" disabled title="Coming soon">
+                        <span class="ad-pill__icon" aria-hidden="true">
+                          ↑
+                        </span>
+                        Helpful
+                      </button>
+                      <button type="button" class="ad-pill" disabled title="Coming soon">
+                        <span class="ad-pill__icon" aria-hidden="true">
+                          ↓
+                        </span>
+                        Not helpful
+                      </button>
+                    </div>
+                    {!thread.is_locked && (
+                      <a class="ad-pill" href={replyHref}>
+                        Reply
+                      </a>
+                    )}
+                    {canDelete && (
+                      <form
+                        method="POST"
+                        action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${post.id}`}
+                        class="inline-form"
+                      >
+                        <CsrfInput token={csrfToken} />
+                        <button type="submit" class="ad-pill ad-pill--danger">
+                          Delete
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        {replies.length === 0 && <div class="ad-empty">No replies yet.</div>}
 
         {thread.is_locked ? (
-          <div class="panel">
-            <div class="empty">This discussion is locked.</div>
-          </div>
+          <div class="ad-locked">This topic is locked.</div>
         ) : user ? (
-          <div class="panel">
-            <div class="panel__head">
-              <h2>Reply</h2>
-            </div>
+          <section class="ad-reply" id="reply">
+            <h2 class="ad-reply__heading">Add a reply</h2>
             <form
-              class="form"
               method="POST"
               action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
             >
-              {formError && <div class="alert">{formError}</div>}
-              <div class="field">
-                <label for="body">Your reply</label>
-                <textarea id="body" name="body" required maxlength="50000" />
-              </div>
-              <div class="form-actions">
-                <button class="btn btn-primary" type="submit">
-                  Post reply
-                </button>
+              <CsrfInput token={csrfToken} />
+              <div class="ad-reply__box">
+                <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
+                  {initials(user.display_name || user.username)}
+                </div>
+                <div class="ad-reply__editor-wrap">
+                  <div class="ask-editor ad-reply__editor">
+                    <textarea
+                      name="body"
+                      required
+                      maxlength="50000"
+                      placeholder="Write a reply… Markdown supported."
+                    />
+                    <div class="ask-toolbar" aria-hidden="true">
+                      <span>B</span>
+                      <span>I</span>
+                      <span>U</span>
+                    </div>
+                  </div>
+                  <div class="ad-reply__actions">
+                    <button class="btn btn-primary" type="submit">
+                      Post reply
+                    </button>
+                  </div>
+                </div>
               </div>
             </form>
-          </div>
+          </section>
         ) : (
-          <div class="panel">
-            <div class="empty">
-              <a href="/login">Sign in</a> to reply.
-            </div>
+          <div class="ad-signin">
+            <a href="/login">Sign in</a> to reply.
           </div>
         )}
-      </>
+      </div>
     )
   }
 </BaseLayout>

@@ -3,37 +3,71 @@ import type { UserPublic } from '../lib/types';
 
 type Props = {
   user?: UserPublic | null;
+  active?: 'ask' | 'browse' | 'search' | null;
 };
 
-const { user = null } = Astro.props;
+const { user = null, active = null } = Astro.props;
+const display = user ? user.display_name || user.username : '';
+const initial = display ? display.slice(0, 1).toUpperCase() : '';
 ---
 
 <header class="site-header">
-  <div class="site-header__inner">
-    <a class="brand" href="/">
-      <span class="brand__mark" aria-hidden="true">F</span>
-      <span>Forum</span>
-    </a>
-    <nav class="nav-actions" aria-label="Account">
+  <div class="site-header__inner page-rail">
+    <a class="brand" href="/">Forum</a>
+
+    <div class="nav-end">
+      <nav class="nav-links" aria-label="Primary">
+        <a href="/ask" class:list={[{ 'is-active': active === 'ask' }]}>Ask</a>
+        <a href="/" class:list={[{ 'is-active': active === 'browse' }]}>Browse</a>
+        <a href="/search" class:list={[{ 'is-active': active === 'search' }]}>Search</a>
+      </nav>
+
       {
         user ? (
-          <>
-            <span class="nav-user">{user.display_name || user.username}</span>
-            <form method="POST" action="/logout" style="display:inline;margin:0">
-              <button class="btn btn-ghost" type="submit">
-                Sign out
-              </button>
-            </form>
-          </>
+          <details class="profile-menu">
+            <summary class="profile-menu__trigger" aria-label={`Account: ${display}`}>
+              <span class="profile-btn" aria-hidden="true">
+                {initial}
+              </span>
+            </summary>
+            <div class="profile-menu__panel" role="menu">
+              <div class="profile-menu__who">
+                <span class="profile-menu__who-name">{display}</span>
+                <span class="profile-menu__who-user">@{user.username}</span>
+              </div>
+              <form method="POST" action="/logout" class="profile-menu__form">
+                <button type="submit" role="menuitem">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </details>
         ) : (
-          <>
-            <a href="/login">Sign in</a>
-            <a class="btn btn-primary" href="/register">
-              Join
-            </a>
-          </>
+          <a class="profile-btn" href="/login" title="Sign in" aria-label="Sign in">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5 19c0-3.3 3.1-6 7-6s7 2.7 7 6" />
+            </svg>
+          </a>
         )
       }
-    </nav>
+    </div>
   </div>
 </header>
+
+<script>
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!(t instanceof Node)) return;
+    document.querySelectorAll('details.profile-menu[open]').forEach((el) => {
+      if (!el.contains(t)) el.removeAttribute('open');
+    });
+  });
+</script>

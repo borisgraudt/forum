@@ -9,9 +9,11 @@ mod thread;
 mod user;
 
 pub use category::Category;
-pub use post::Post;
-pub use thread::Thread;
+pub use post::{Post, PostView, PostViewJson};
+pub use thread::{Thread, ThreadView};
 pub use user::{User, UserPublic, UserRole};
+
+// re-export for handlers that only need table rows
 
 #[cfg(test)]
 mod schema_tests {

@@ -1,6 +1,6 @@
 [package]
 name = "forum-backend"
-version = "0.1.0-alpha.1"
+version = "0.2.0"
 edition = "2021"
 publish = false
 
@@ -8,7 +8,7 @@ publish = false
 axum = { version = "0.8", features = ["macros"] }
 axum-extra = { version = "0.10", features = ["cookie"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
+tower-http = { version = "0.6", features = ["cors", "limit", "set-header", "trace"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # default-features off: sqlx's defaults pull mysql/postgres (and rsa), which we don't use.
@@ -30,6 +30,10 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 validator = { version = "0.19", features = ["derive"] }
 regex = "1"
 time = "0.3"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+ammonia = "4"
+rand = "0.8"
+futures-util = "0.3.33"
 
 [dev-dependencies]
 http-body-util = "0.1"

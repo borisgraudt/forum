@@ -4,6 +4,6 @@ pub mod forum;
 pub use auth::{AuthResponse, LoginRequest, RegisterRequest};
 pub use forum::{
     CategoryListResponse, CategoryResponse, CreateCategoryRequest, CreatePostRequest,
-    CreateThreadRequest, ListQuery, PostListResponse, PostResponse, ThreadListResponse,
-    ThreadResponse,
+    CreateThreadRequest, CsrfResponse, ListQuery, PostListResponse, PostResponse, SearchHit,
+    SearchQuery, SearchResponse, ThreadListResponse, ThreadResponse, UpdateThreadRequest,
 };

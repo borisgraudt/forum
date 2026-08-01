@@ -1,236 +1,225 @@
 # Forum
 
-High-performance, security-focused forum engine built with **Rust + Astro**.
+Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI.
 
-Designed for niche communities that value speed, low resource usage, and strong security guarantees.
+Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-> Single responsibility: be extremely fast and hard to break.
-
----
-
-## Tech Stack
-
-### Backend
-| Technology | Purpose |
-|----------|--------|
-| **Rust** | Memory safety + maximum performance |
-| **Axum** | Modern, ergonomic web framework |
-| **SQLx** | Async SQL with compile-time checked queries |
-| **SQLite** (WAL mode) | Extremely fast, zero-config, single-file database |
-| **Tower** | Middleware (timeouts, rate limiting, etc.) |
-| **jsonwebtoken** + **bcrypt** | Authentication |
-| **pulldown-cmark** | Safe & fast Markdown rendering |
-| **validator** + **serde** | Input validation |
-
-### Frontend
-| Technology | Purpose |
-|----------|--------|
-| **Astro** | Zero-JS by default, excellent performance |
-| **TypeScript** | Type safety |
-| **Tailwind CSS** | Utility-first styling |
-| **HTMX** (optional) | Progressive enhancement without heavy JS |
-
-### Infrastructure
-- Docker + Docker Compose
-- sqlx-cli for migrations
-- Makefile for common tasks
+**Current version:** `0.2.0`
 
 ---
 
-## Project Structure
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| API | Rust, Axum, SQLx, SQLite (WAL), JWT cookie auth |
+| UI | Astro (Node adapter), TypeScript |
+| Content | Markdown (pulldown-cmark) + ammonia sanitize |
+| Search | SQLite FTS5 |
+| Ops | Docker Compose, GHCR, Makefile, GitHub Actions |
+
+---
+
+## Layout
 
 ```text
 forum/
-├── backend/                 # Rust + Axum API
-│   ├── src/
-│   │   ├── main.rs
-│   │   ├── config.rs
-│   │   ├── db.rs
-│   │   ├── error.rs
-│   │   ├── models/          # users, categories, threads, posts
-│   │   └── state.rs
-│   ├── migrations/
-│   └── Cargo.toml
-│
-├── frontend/                # Astro
-│   ├── src/
-│   └── package.json
-│
-├── .github/workflows/ci.yml
+├── backend/          # API + migrations
+├── frontend/         # Astro UI
+├── .github/workflows/
 ├── docker-compose.yml
 ├── Makefile
-├── CONTRIBUTING.md
 └── README.md
 ```
 
 ---
 
-## Getting Started
+## Quick start
 
-### Prerequisites
-
-- Rust (latest stable) — install via `rustup`
-- Node.js 20+
-- sqlx-cli: `cargo install sqlx-cli --no-default-features --features sqlite`
-- Docker (optional)
-
-### 1. Clone & setup
+**Prereqs:** Rust stable, Node 22+, optional `sqlx-cli` / `cargo-watch`.
 
 ```bash
-git clone <your-repo-url> ultraforum
-cd ultraforum
-```
-
-### 2. Backend
-
-```bash
+# Backend
 cd backend
 cp .env.example .env
-# edit .env if needed
+sqlx database create && sqlx migrate run
+cargo run          # :3000
 
-# Create database and run migrations
-sqlx database create
-sqlx migrate run
-
-# Run in development
-cargo watch -x run
-```
-
-Backend will be available at `http://localhost:3000`
-
-### 3. Frontend
-
-```bash
+# Frontend (other terminal)
 cd frontend
 npm install
-cp .env.example .env
-
-npm run dev
+cp .env.example .env   # PUBLIC_API_URL=http://127.0.0.1:3000/api/v1
+npm run dev            # :4321
 ```
 
-Frontend will be available at `http://localhost:4321`
-
-UI is a minimal community shell (Apple Discussions–inspired): topics, threads, posts, sign-in/join. Start the backend first so SSR can reach the API.
-
-### 4. Development with Makefile (recommended)
+Or:
 
 ```bash
-make setup        # deps + .env
-make migrate      # apply SQLx migrations
-make dev          # cargo-watch backend + Astro HMR
-make lint         # rustfmt + clippy + frontend lint
-make test         # backend tests
-make build        # production build
-make audit        # cargo audit + npm audit
+make setup && make migrate && make dev
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for Git flow and PR rules.
+### Useful make targets
 
----
+| Target | What |
+|--------|------|
+| `make dev` | API + UI (needs cargo-watch) |
+| `make test` | Backend tests |
+| `make lint` | fmt, clippy, frontend check |
+| `make build` | Release backend + frontend build |
+| `make package` | Portable tarball under `dist/` |
+| `make docker-up` | Compose stack |
 
-## Workflows
+### Moderator / admin
 
-| Workflow | Command / place | Notes |
-|----------|-----------------|-------|
-| Local development | `make dev` | Backend `:3000`, frontend `:4321` |
-| Migrations | `make migrate` | SQLx + files in `backend/migrations/` |
-| Lint & format | `make lint` / `make fmt` | rustfmt, clippy `-D warnings`, Prettier, `astro check` |
-| Tests | `make test` | Unit + HTTP smoke tests on backend |
-| Package (tarball) | `make package` | Portable archive under `dist/` / Release **Assets** |
-| GitHub Packages | one package **`forum`** on GHCR | tags `backend-*` / `frontend-*` |
-| Docker | `make docker-up` | Compose profile `app` |
-| Git flow | `main` ← `develop` ← `feature/*` | Details in CONTRIBUTING |
-| CI | `.github/workflows/ci.yml` | fmt · clippy · test · frontend build · audit on every PR |
-| Release | tag `v*` → release workflow | Tarballs + GHCR + GitHub Release |
-| Security | `make audit` | `cargo audit` + `npm audit --audit-level=high` |
+No separate admin UI yet. Promote a user, then use Lock / Pin / Delete on a thread page:
 
-See **[docs/DEPLOY.md](./docs/DEPLOY.md)** for production env, Docker, **GitHub Packages**, and pre-releases.
-
-**Current version:** `0.1.0-alpha.1`
-
----
-
-## Environment Variables
-
-### Backend (`.env`)
-
-```env
-HOST=0.0.0.0
-PORT=3000
-DATABASE_URL=sqlite:forum.db?mode=rwc
-JWT_SECRET=change-me-to-a-long-random-string
-JWT_TTL_SECS=604800
-COOKIE_SECURE=false
-RUST_LOG=info
-CORS_ORIGIN=http://localhost:4321
-```
-
-### Auth API (`/api/v1/auth`)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/register` | Create account, set `session` httpOnly cookie |
-| POST | `/login` | Login (username or email), set cookie |
-| POST | `/logout` | Clear session cookie |
-| GET | `/me` | Current user (requires cookie) |
-
-Cookie: `session` — httpOnly, SameSite=Lax, Secure when `COOKIE_SECURE=true`.
-
-### Forum API
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/categories` | no | List categories |
-| GET | `/api/v1/categories/{slug}` | no | Get category |
-| POST | `/api/v1/categories` | yes | Create category |
-| GET | `/api/v1/categories/{slug}/threads` | no | List threads (`limit`/`offset`) |
-| GET | `/api/v1/categories/{c}/threads/{t}` | no | Get thread |
-| POST | `/api/v1/categories/{slug}/threads` | yes | Create thread + first post |
-| GET | `/api/v1/categories/{c}/threads/{t}/posts` | no | List posts |
-| POST | `/api/v1/categories/{c}/threads/{t}/posts` | yes | Reply (403 if locked) |
-
-### Frontend (`.env`)
-
-```env
-PUBLIC_API_URL=http://localhost:3000/api/v1
+```bash
+sqlite3 backend/forum.db "UPDATE users SET role = 'moderator' WHERE username = 'you';"
 ```
 
 ---
 
-## Security Highlights
+## API sketch (`/api/v1`)
 
-- Memory-safe backend (Rust)
-- httpOnly + Secure + SameSite cookies
-- CSRF protection
-- Strict CORS
-- Security headers (CSP, HSTS, X-Content-Type-Options, etc.)
-- Input validation on every endpoint
-- Rate limiting (Tower layer)
-- Prepared statements only (SQLx)
+| Area | Paths |
+|------|--------|
+| Auth | `POST /auth/register\|login\|logout`, `GET /auth/me`, `GET /auth/csrf` |
+| Categories | `GET/POST /categories`, `GET …/{slug}`, `GET …/{slug}/children` |
+| Threads | `GET/POST …/threads`, `GET/PATCH …/threads/{t}` |
+| Posts | `GET/POST …/posts`, `DELETE …/posts/{id}` |
+| Search | `GET /search?q=` |
 
----
-
-## Performance Goals
-
-- TTFB < 30ms on modest hardware
-- Very low memory footprint
-- Excellent Lighthouse scores (especially Performance & Best Practices)
-- Single binary backend possible
+Mutating requests need CSRF: cookie `csrf` + header `X-CSRF-Token`.
 
 ---
 
-## Roadmap
+## Security (current)
 
-1. Core CRUD + Auth
-2. Markdown + sanitization
-3. Pagination & sorting
-4. Search (FTS5)
-5. Admin panel
-6. Rate limiting & moderation tools
-7. Production hardening + deployment guides
+- httpOnly session cookie, optional Secure
+- CSRF double-submit
+- Security headers + IP rate limit
+- Input validation, prepared statements
+- Sanitized Markdown HTML
+
+---
+
+## Roadmap to v1.0.0
+
+Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community product** that feels as polished as Apple Discussions and can run a real niche forum in production (including stuff we used to call “optional”).
+
+### Done (through v0.2) — foundation
+- Auth, CRUD, category hierarchy
+- Apple-style Browse / Ask / Thread UI
+- Markdown, pagination, FTS search
+- CSRF, headers, rate limit, view counts
+- Basic mod (lock / pin / delete)
+- Basic responsive CSS (not yet a full mobile product)
+
+### v0.3 — Community product core
+- [ ] **Admin panel** (`/admin`): users, roles, categories, reports, site settings
+- [ ] **Me too / Helpful** real votes + rankings
+- [ ] **Quote / reply-to** specific posts
+- [ ] **Edit / delete** own content (+ soft-delete, edit history)
+- [ ] **User profiles** (avatar, bio, activity, reputation)
+- [ ] **Drafts** for ask/reply
+
+### v0.4 — Trust, safety, identity
+- [ ] **Report** + mod queue
+- [ ] **Ban / mute / timeout** users
+- [ ] **Audit log** of every mod/admin action
+- [ ] Per-route **rate limits** (auth / post / search)
+- [ ] **Password reset** + email verification
+- [ ] **Mentions** (`@user`)
+
+### v0.5 — Media & composition
+- [ ] **Image / file attachments** (limits, MIME allowlist, virus scan hooks)
+- [ ] **Avatars** upload + defaults
+- [ ] **Real markdown toolbar** (bold/italic/list/link/code, not decorative)
+- [ ] **Embed previews** for safe links (optional toggle)
+- [ ] Clipboard paste images into posts
+
+### v0.6 — Discovery, engagement, realtime
+- [ ] **Notifications** (in-app + email digests)
+- [ ] **Watch / subscribe** thread & category
+- [ ] **Sort / filters** (activity, newest, unanswered, solved)
+- [ ] **Solved / accepted answer**
+- [ ] **Realtime** updates (websockets or SSE: new replies, live counts)
+- [ ] **Unreads** badges
+
+### v0.7 — Mobile + performance (first-class)
+- [ ] **Phone-first layout**: nav, forms, thread actions, tables → stacks
+- [ ] Touch targets ≥ 44px, safe-area insets, sticky composer on mobile
+- [ ] Responsive images / avatars (`srcset`), no horizontal scroll
+- [ ] PWA install shell (manifest + offline shell optional)
+- [ ] **Perf budget**: TTFB p95 &lt; 50ms local API; Lighthouse mobile Perf ≥ 90
+- [ ] HTTP cache headers for static; SSR data waterfalls eliminated
+- [ ] SQLite WAL + connection/pool tuning; optional read replica later
+- [ ] Bundle hygiene: almost zero client JS except progressive bits
+
+### v0.8 — Ops & multi-community scale
+- [ ] Production defaults: HSTS, Secure cookies, reverse-proxy recipes
+- [ ] **Backups** (SQLite snapshot + restore runbook)
+- [ ] Structured logs + metrics (Prometheus/OpenTelemetry)
+- [ ] E2E CI (Playwright) + load test baseline
+- [ ] **Multi-tenant / multi-site** mode (one binary, many communities)
+- [ ] OpenAPI for `/api/v1` + seed/demo command
+- [ ] i18n (RU/EN minimum)
+
+### v0.9 — Polish & “cooler than NodeBB” bar
+- [ ] Design system tokens + dark mode
+- [ ] Full keyboard a11y + WCAG AA pass
+- [ ] Rich search (filters by author/category/date)
+- [ ] Import from Discourse / NodeBB (CSV/JSON tools)
+- [ ] Federation hooks *or* clean plugin API (pick one path)
+- [ ] Public status / health dashboard for ops
+
+### v1.0.0 — Release bar (all of the above shipped)
+- [ ] Feature freeze of the full list above
+- [ ] Stable `/api/v1` compatibility promise
+- [ ] Security review (no critical/high open issues)
+- [ ] Mobile + desktop Lighthouse + real-device QA
+- [ ] Load test: documented numbers for N concurrent users on modest VPS
+- [ ] Tagged `v1.0.0` + release notes + upgrade path from 0.x
+
+**Post-v1.0 (nice later, not blocking 1.0):** full multi-region SaaS billing, ActivityPub federation if not chosen in 0.9, native apps.
+
+---
+
+## Mobile & speed — current status (honest)
+
+### Mobile (today)
+| Area | Status |
+|------|--------|
+| Viewport meta | yes |
+| Fluid layout / page rail | yes (`max-width` + padding) |
+| Some breakpoints | yes (~480 / 600 / 700 / 800px) — header, lists, thread |
+| Full phone UX | **partial** — works, not “app-like” |
+| Nav on small screens | may crowd (Ask / Browse / Search + avatar) |
+| Thread actions (pills) | wrap, but dense |
+| Forms (Ask/Search) | usable; not optimized for thumb |
+| Safe areas / bottom nav | **no** |
+| Touch target audit | **no** |
+| PWA | **no** |
+
+**Verdict:** desktop-first with responsive CSS. Fine for reading on phone; not yet a polished mobile product. That’s a first-class **v0.7** track for v1.0.
+
+### Speed (today)
+| Area | Status |
+|------|--------|
+| Backend | Rust + SQLite — inherently fast for small/medium communities |
+| SSR API hops | fixed `127.0.0.1` + parallel `Promise.all` on key pages |
+| Measured earlier | API ~0.5–1 ms; full SSR page ~10–15 ms local (dev) |
+| Production build | `cargo build --release` + Astro build — much better than `astro dev` |
+| Client JS | minimal by design (Astro) — good for mobile CPU |
+| Caching | almost none beyond browser defaults |
+| Images/CDN | N/A until attachments |
+| FTS search | local SQLite — fast for typical forum size |
+| Rate limit | in-memory (fine single-node) |
+
+**Verdict:** architecture is already **speed-friendly**. Bottlenecks later will be: N+1 if we get sloppy, big attachments, uncached SSR, and `astro dev` feeling “slow” in development. v1.0 needs a real **perf budget + load test** (v0.7–v0.8), not a rewrite.
 
 ---
 
 ## License
 
-MIT
+No license file is shipped in this repo. Add one if you open-source or redistribute.
