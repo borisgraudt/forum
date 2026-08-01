@@ -140,11 +140,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      # Only forum-* tarballs from the package jobs. Do NOT download Buildx
+      # dockerbuild cache artifacts (names like owner~repo~*.dockerbuild) —
+      # they are unrelated and flaky to re-download, which broke v0.2.0 release.
+      - name: Download package artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
+          pattern: forum-*
           merge-multiple: true
+          if-no-files-found: error
 
       - name: Detect prerelease
         id: meta
