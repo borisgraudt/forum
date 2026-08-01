@@ -325,10 +325,7 @@ mod tests {
             .find(|c| c.starts_with("csrf="))
             .cloned()
             .unwrap_or(csrf_cookie);
-        let token_after = csrf_after
-            .strip_prefix("csrf=")
-            .unwrap_or("")
-            .to_string();
+        let token_after = csrf_after.strip_prefix("csrf=").unwrap_or("").to_string();
         let cookie_header = merge_cookies(&[session.split(';').next().unwrap(), &csrf_after]);
 
         // Logout

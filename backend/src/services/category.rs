@@ -69,12 +69,11 @@ impl CategoryService {
     }
 
     pub async fn slug_exists(db: &SqlitePool, slug: &str) -> AppResult<bool> {
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM categories WHERE slug = ? COLLATE NOCASE",
-        )
-        .bind(slug)
-        .fetch_one(db)
-        .await?;
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM categories WHERE slug = ? COLLATE NOCASE")
+                .bind(slug)
+                .fetch_one(db)
+                .await?;
         Ok(count > 0)
     }
 
@@ -90,7 +89,9 @@ impl CategoryService {
                 return Ok(candidate);
             }
         }
-        Err(AppError::Conflict("could not allocate unique category slug".into()))
+        Err(AppError::Conflict(
+            "could not allocate unique category slug".into(),
+        ))
     }
 
     pub async fn create(

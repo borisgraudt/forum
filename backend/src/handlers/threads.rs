@@ -35,8 +35,7 @@ async fn list_threads(
     let limit = query.limit();
     let offset = query.offset();
     let total = ThreadService::count_by_category(&state.db, category.id).await?;
-    let threads =
-        ThreadService::list_by_category(&state.db, category.id, limit, offset).await?;
+    let threads = ThreadService::list_by_category(&state.db, category.id, limit, offset).await?;
     Ok((
         StatusCode::OK,
         Json(ThreadListResponse {

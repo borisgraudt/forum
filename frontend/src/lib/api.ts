@@ -1,12 +1,4 @@
-import type {
-  ApiError,
-  Category,
-  PageMeta,
-  Post,
-  SearchHit,
-  Thread,
-  UserPublic,
-} from './types';
+import type { ApiError, Category, PageMeta, Post, SearchHit, Thread, UserPublic } from './types';
 
 // Prefer 127.0.0.1 over localhost: Node's fetch resolves localhost to ::1 first,
 // and the API often only listens on IPv4 — each SSR hop paid ~10ms+ of delay.
@@ -66,7 +58,10 @@ export function getCookieHeader(request: Request): string | null {
   return request.headers.get('cookie');
 }
 
-export function readCookieValue(cookieHeader: string | null | undefined, name: string): string | null {
+export function readCookieValue(
+  cookieHeader: string | null | undefined,
+  name: string,
+): string | null {
   if (!cookieHeader) return null;
   for (const part of cookieHeader.split(';')) {
     const [k, ...rest] = part.trim().split('=');

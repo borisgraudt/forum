@@ -48,12 +48,11 @@ impl ThreadService {
     }
 
     pub async fn count_by_category(db: &SqlitePool, category_id: i64) -> AppResult<i64> {
-        let count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM threads WHERE category_id = ?",
-        )
-        .bind(category_id)
-        .fetch_one(db)
-        .await?;
+        let count =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM threads WHERE category_id = ?")
+                .bind(category_id)
+                .fetch_one(db)
+                .await?;
         Ok(count)
     }
 

@@ -88,8 +88,14 @@ mod tests {
 
     #[test]
     fn slugify_cyrillic() {
-        assert_eq!(slugify("Информационная безопасность"), "informatsionnaya-bezopasnost");
+        assert_eq!(
+            slugify("Информационная безопасность"),
+            "informatsionnaya-bezopasnost"
+        );
         assert_eq!(slugify("Сети"), "seti");
-        assert_ne!(slugify("Коммутации"), slugify("Информационная безопасность"));
+        assert_ne!(
+            slugify("Коммутации"),
+            slugify("Информационная безопасность")
+        );
     }
 }

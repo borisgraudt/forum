@@ -15,7 +15,6 @@ pub use user::{User, UserPublic, UserRole};
 
 // re-export for handlers that only need table rows
 
-
 #[cfg(test)]
 mod schema_tests {
     use super::*;

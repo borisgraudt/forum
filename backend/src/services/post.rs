@@ -38,11 +38,10 @@ impl PostService {
     }
 
     pub async fn count_by_thread(db: &SqlitePool, thread_id: i64) -> AppResult<i64> {
-        let count =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts WHERE thread_id = ?")
-                .bind(thread_id)
-                .fetch_one(db)
-                .await?;
+        let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts WHERE thread_id = ?")
+            .bind(thread_id)
+            .fetch_one(db)
+            .await?;
         Ok(count)
     }
 

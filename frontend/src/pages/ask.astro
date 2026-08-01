@@ -72,9 +72,7 @@ try {
             class="ask-select__control"
             aria-label="Community / topic"
           >
-            <option value="" disabled selected={!preselect}>
-              Select a topic
-            </option>
+            <option value="" disabled selected={!preselect}> Select a topic </option>
             {
               leaves.map((c) => (
                 <option value={c.slug} selected={c.slug === preselect}>
@@ -90,8 +88,7 @@ try {
                 stroke="currentColor"
                 stroke-width="1.6"
                 stroke-linecap="round"
-                stroke-linejoin="round"
-              />
+                stroke-linejoin="round"></path>
             </svg>
           </span>
         </div>

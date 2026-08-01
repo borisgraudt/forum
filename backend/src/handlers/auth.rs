@@ -29,7 +29,11 @@ async fn csrf(
 ) -> AppResult<(StatusCode, CookieJar, Json<CsrfResponse>)> {
     let token = read_csrf_cookie(&jar).unwrap_or_else(generate_csrf_token);
     let jar = set_csrf_cookie(jar, token.clone(), &state.config);
-    Ok((StatusCode::OK, jar, Json(CsrfResponse { csrf_token: token })))
+    Ok((
+        StatusCode::OK,
+        jar,
+        Json(CsrfResponse { csrf_token: token }),
+    ))
 }
 
 async fn register(

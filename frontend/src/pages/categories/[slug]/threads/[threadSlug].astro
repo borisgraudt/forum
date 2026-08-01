@@ -152,11 +152,15 @@ function bodyHtml(post: Post) {
             <div class="ad-post__actions" role="group" aria-label="Question actions">
               <div class="ad-pill-group">
                 <button type="button" class="ad-pill" disabled title="Coming soon">
-                  <span class="ad-pill__icon" aria-hidden="true">↑</span>
+                  <span class="ad-pill__icon" aria-hidden="true">
+                    ↑
+                  </span>
                   Helpful
                 </button>
                 <button type="button" class="ad-pill" disabled title="Coming soon">
-                  <span class="ad-pill__icon" aria-hidden="true">↓</span>
+                  <span class="ad-pill__icon" aria-hidden="true">
+                    ↓
+                  </span>
                   Not helpful
                 </button>
               </div>
@@ -195,11 +199,15 @@ function bodyHtml(post: Post) {
               <div class="ad-post__actions" role="group" aria-label="Reply actions">
                 <div class="ad-pill-group">
                   <button type="button" class="ad-pill" disabled title="Coming soon">
-                    <span class="ad-pill__icon" aria-hidden="true">↑</span>
+                    <span class="ad-pill__icon" aria-hidden="true">
+                      ↑
+                    </span>
                     Helpful
                   </button>
                   <button type="button" class="ad-pill" disabled title="Coming soon">
-                    <span class="ad-pill__icon" aria-hidden="true">↓</span>
+                    <span class="ad-pill__icon" aria-hidden="true">
+                      ↓
+                    </span>
                     Not helpful
                   </button>
                 </div>
@@ -238,9 +246,7 @@ function bodyHtml(post: Post) {
                   <div class="ad-post__who">
                     <div class="ad-post__name-row">
                       <span class="ad-post__name">{who}</span>
-                      {post.author_id === op.author_id && (
-                        <span class="ad-post__role">Author</span>
-                      )}
+                      {post.author_id === op.author_id && <span class="ad-post__role">Author</span>}
                     </div>
                   </div>
                 </header>
@@ -255,11 +261,15 @@ function bodyHtml(post: Post) {
                   <div class="ad-post__actions" role="group" aria-label="Reply actions">
                     <div class="ad-pill-group">
                       <button type="button" class="ad-pill" disabled title="Coming soon">
-                        <span class="ad-pill__icon" aria-hidden="true">↑</span>
+                        <span class="ad-pill__icon" aria-hidden="true">
+                          ↑
+                        </span>
                         Helpful
                       </button>
                       <button type="button" class="ad-pill" disabled title="Coming soon">
-                        <span class="ad-pill__icon" aria-hidden="true">↓</span>
+                        <span class="ad-pill__icon" aria-hidden="true">
+                          ↓
+                        </span>
                         Not helpful
                       </button>
                     </div>

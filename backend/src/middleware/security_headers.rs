@@ -57,7 +57,9 @@ where
             // API-only CSP: no active content expected from this origin.
             headers.insert(
                 header::CONTENT_SECURITY_POLICY,
-                HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'; base-uri 'none'"),
+                HeaderValue::from_static(
+                    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+                ),
             );
             headers.insert(
                 header::HeaderName::from_static("x-permitted-cross-domain-policies"),

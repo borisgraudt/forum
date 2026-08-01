@@ -70,7 +70,9 @@ async fn create_category(
 
     let name = body.name.trim().to_string();
     if name.is_empty() {
-        return Err(crate::error::AppError::BadRequest("name is required".into()));
+        return Err(crate::error::AppError::BadRequest(
+            "name is required".into(),
+        ));
     }
 
     let slug = body
