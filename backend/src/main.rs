@@ -20,7 +20,10 @@ use tracing_subscriber::EnvFilter;
 
 use crate::config::Config;
 use crate::error::AppResult;
-use crate::handlers::{auth_router, categories_router, posts_router, threads_router};
+use crate::handlers::{
+    auth_router, categories_router, posts_router, search_router, threads_router,
+};
+use crate::middleware::{CsrfLayer, RateLimitLayer, SecurityHeadersLayer};
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -67,9 +70,16 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::COOKIE])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+            header::COOKIE,
+            header::HeaderName::from_static("x-csrf-token"),
+        ])
         .allow_credentials(true);
 
+    // Layer order: outermost runs first on request.
+    // security headers ← rate limit ← csrf ← trace ← routes
     Ok(Router::new()
         .route("/health", get(health))
         .route("/api/v1/health", get(health))
@@ -77,9 +87,15 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
         .nest("/api/v1/categories", categories_router())
         .nest(
             "/api/v1",
-            Router::new().merge(threads_router()).merge(posts_router()),
+            Router::new()
+                .merge(threads_router())
+                .merge(posts_router())
+                .merge(search_router()),
         )
         .layer(TraceLayer::new_for_http())
+        .layer(CsrfLayer)
+        .layer(RateLimitLayer::default())
+        .layer(SecurityHeadersLayer)
         .layer(cors)
         .with_state(state))
 }
@@ -167,6 +183,45 @@ mod tests {
             .map(str::to_string)
     }
 
+    fn set_cookies(response: &axum::http::Response<Body>) -> Vec<String> {
+        response
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .map(|c| c.split(';').next().unwrap_or(c).to_string())
+            .collect()
+    }
+
+    /// Fetch a CSRF token + Cookie header value for mutating requests.
+    async fn csrf_pair(app: &Router) -> (String, String) {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/auth/csrf")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let cookies = set_cookies(&response);
+        let csrf_cookie = cookies
+            .iter()
+            .find(|c| c.starts_with("csrf="))
+            .cloned()
+            .expect("csrf cookie");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let token = json["csrf_token"].as_str().unwrap().to_string();
+        (csrf_cookie, token)
+    }
+
+    fn merge_cookies(parts: &[&str]) -> String {
+        parts.join("; ")
+    }
+
     #[tokio::test]
     async fn health_returns_ok() {
         let state = test_state().await;
@@ -194,6 +249,7 @@ mod tests {
     async fn register_login_me_logout_flow() {
         let state = test_state().await;
         let app = build_router(state, "http://localhost:4321").expect("router");
+        let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
 
         // Register
         let response = app
@@ -203,6 +259,8 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/auth/register")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(serde_json::json!({
                         "username": "alice",
                         "email": "alice@example.com",
@@ -226,13 +284,13 @@ mod tests {
         assert!(json["user"].get("email").is_none());
 
         // /me with cookie
-        let cookie_header = session.split(';').next().unwrap();
+        let session_pair = session.split(';').next().unwrap();
         let response = app
             .clone()
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/auth/me")
-                    .header(header::COOKIE, cookie_header)
+                    .header(header::COOKIE, session_pair)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -240,7 +298,8 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
-        // Login
+        // Login (fresh CSRF)
+        let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
         let response = app
             .clone()
             .oneshot(
@@ -248,6 +307,8 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/auth/login")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(serde_json::json!({
                         "login": "alice@example.com",
                         "password": "password123"
@@ -258,7 +319,14 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let session = cookie_from(&response).expect("session cookie on login");
-        let cookie_header = session.split(';').next().unwrap().to_string();
+        let cookies = set_cookies(&response);
+        let csrf_after = cookies
+            .iter()
+            .find(|c| c.starts_with("csrf="))
+            .cloned()
+            .unwrap_or(csrf_cookie);
+        let token_after = csrf_after.strip_prefix("csrf=").unwrap_or("").to_string();
+        let cookie_header = merge_cookies(&[session.split(';').next().unwrap(), &csrf_after]);
 
         // Logout
         let response = app
@@ -268,6 +336,7 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/auth/logout")
                     .header(header::COOKIE, &cookie_header)
+                    .header("x-csrf-token", &token_after)
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -296,30 +365,17 @@ mod tests {
     async fn login_rejects_bad_password() {
         let state = test_state().await;
         let app = build_router(state, "http://localhost:4321").expect("router");
+        let _ = register_cookie(&app, "bob").await;
 
-        let _ = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/auth/register")
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(json_body(serde_json::json!({
-                        "username": "bob",
-                        "email": "bob@example.com",
-                        "password": "password123"
-                    })))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
+        let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
         let response = app
             .oneshot(
                 Request::builder()
                     .method("POST")
                     .uri("/api/v1/auth/login")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(serde_json::json!({
                         "login": "bob",
                         "password": "wrong-password"
@@ -343,6 +399,7 @@ mod tests {
             "password": "password123"
         });
 
+        let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
         let response = app
             .clone()
             .oneshot(
@@ -350,6 +407,8 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/auth/register")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(payload.clone()))
                     .unwrap(),
             )
@@ -357,12 +416,15 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
 
+        let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
         let response = app
             .oneshot(
                 Request::builder()
                     .method("POST")
                     .uri("/api/v1/auth/register")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(serde_json::json!({
                         "username": "Carol",
                         "email": "other@example.com",
@@ -379,6 +441,7 @@ mod tests {
     async fn register_validates_short_password() {
         let state = test_state().await;
         let app = build_router(state, "http://localhost:4321").expect("router");
+        let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
 
         let response = app
             .oneshot(
@@ -386,6 +449,8 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/auth/register")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(serde_json::json!({
                         "username": "dave",
                         "email": "dave@example.com",
@@ -399,7 +464,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
-    async fn register_cookie(app: &Router, username: &str) -> String {
+    /// Returns `session=...; csrf=...` cookie header and the csrf token value.
+    async fn register_cookie(app: &Router, username: &str) -> (String, String) {
+        let (csrf_cookie, csrf_token) = csrf_pair(app).await;
         let response = app
             .clone()
             .oneshot(
@@ -407,6 +474,8 @@ mod tests {
                     .method("POST")
                     .uri("/api/v1/auth/register")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(serde_json::json!({
                         "username": username,
                         "email": format!("{username}@example.com"),
@@ -418,14 +487,22 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
         let session = cookie_from(&response).expect("cookie");
-        session.split(';').next().unwrap().to_string()
+        let session = session.split(';').next().unwrap().to_string();
+        let cookies = set_cookies(&response);
+        let csrf = cookies
+            .iter()
+            .find(|c| c.starts_with("csrf="))
+            .cloned()
+            .unwrap_or(csrf_cookie);
+        let token = csrf.strip_prefix("csrf=").unwrap_or("").to_string();
+        (merge_cookies(&[&session, &csrf]), token)
     }
 
     #[tokio::test]
     async fn forum_crud_category_thread_post_flow() {
         let state = test_state().await;
         let app = build_router(state, "http://localhost:4321").expect("router");
-        let cookie = register_cookie(&app, "erin").await;
+        let (cookie, csrf) = register_cookie(&app, "erin").await;
 
         // Create category (auth)
         let response = app
@@ -436,6 +513,7 @@ mod tests {
                     .uri("/api/v1/categories")
                     .header(header::CONTENT_TYPE, "application/json")
                     .header(header::COOKIE, &cookie)
+                    .header("x-csrf-token", &csrf)
                     .body(json_body(serde_json::json!({
                         "name": "General",
                         "description": "General chat"
@@ -458,9 +536,10 @@ mod tests {
                     .uri("/api/v1/categories/general/threads")
                     .header(header::CONTENT_TYPE, "application/json")
                     .header(header::COOKIE, &cookie)
+                    .header("x-csrf-token", &csrf)
                     .body(json_body(serde_json::json!({
                         "title": "Hello World",
-                        "body": "Opening post content"
+                        "body": "Opening **post** content"
                     })))
                     .unwrap(),
             )
@@ -471,7 +550,11 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["thread"]["slug"], "hello-world");
         assert_eq!(json["thread"]["post_count"], 1);
-        assert_eq!(json["first_post"]["body"], "Opening post content");
+        assert_eq!(json["first_post"]["body"], "Opening **post** content");
+        assert!(json["first_post"]["body_html"]
+            .as_str()
+            .unwrap()
+            .contains("<strong>post</strong>"));
 
         // Reply
         let response = app
@@ -482,6 +565,7 @@ mod tests {
                     .uri("/api/v1/categories/general/threads/hello-world/posts")
                     .header(header::CONTENT_TYPE, "application/json")
                     .header(header::COOKIE, &cookie)
+                    .header("x-csrf-token", &csrf)
                     .body(json_body(serde_json::json!({
                         "body": "A reply"
                     })))
@@ -496,7 +580,7 @@ mod tests {
             .clone()
             .oneshot(
                 Request::builder()
-                    .uri("/api/v1/categories/general/threads/hello-world/posts")
+                    .uri("/api/v1/categories/general/threads/hello-world/posts?limit=50")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -506,8 +590,9 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["posts"].as_array().unwrap().len(), 2);
+        assert_eq!(json["total"], 2);
 
-        // Thread shows updated post_count
+        // Thread shows updated post_count + view increment
         let response = app
             .oneshot(
                 Request::builder()
@@ -521,13 +606,14 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["thread"]["post_count"], 2);
+        assert!(json["thread"]["view_count"].as_i64().unwrap() >= 1);
     }
 
     #[tokio::test]
     async fn create_thread_requires_auth() {
         let state = test_state().await;
         let app = build_router(state, "http://localhost:4321").expect("router");
-        let cookie = register_cookie(&app, "frank").await;
+        let (cookie, csrf) = register_cookie(&app, "frank").await;
 
         let _ = app
             .clone()
@@ -537,18 +623,22 @@ mod tests {
                     .uri("/api/v1/categories")
                     .header(header::CONTENT_TYPE, "application/json")
                     .header(header::COOKIE, &cookie)
+                    .header("x-csrf-token", &csrf)
                     .body(json_body(serde_json::json!({ "name": "Offtopic" })))
                     .unwrap(),
             )
             .await
             .unwrap();
 
+        let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
         let response = app
             .oneshot(
                 Request::builder()
                     .method("POST")
                     .uri("/api/v1/categories/offtopic/threads")
                     .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &csrf_cookie)
+                    .header("x-csrf-token", &csrf_token)
                     .body(json_body(serde_json::json!({
                         "title": "Nope",
                         "body": "should fail"
@@ -558,5 +648,26 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn security_headers_present() {
+        let state = test_state().await;
+        let app = build_router(state, "http://localhost:4321").expect("router");
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("x-content-type-options").unwrap(),
+            "nosniff"
+        );
+        assert_eq!(response.headers().get("x-frame-options").unwrap(), "DENY");
     }
 }

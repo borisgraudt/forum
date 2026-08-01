@@ -8,7 +8,7 @@ BACKEND := $(ROOT)/backend
 FRONTEND := $(ROOT)/frontend
 
 export DATABASE_URL ?= sqlite:$(BACKEND)/forum.db?mode=rwc
-export VERSION ?= 0.1.0-alpha.1
+export VERSION ?= 0.2.0
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | \
@@ -40,8 +40,40 @@ build: ## Production build (backend + frontend)
 	cd $(FRONTEND) && npm run build
 
 package: ## Build portable tarball under dist/ (binary + UI + migrations)
-	chmod +x $(ROOT)/scripts/package.sh
-	VERSION=$(VERSION) $(ROOT)/scripts/package.sh
+	@bash -euo pipefail -c '\
+	VERSION="$(VERSION)"; \
+	TARGET="$${TARGET:-$$(rustc -vV | sed -n "s/^host: //p")}"; \
+	OUT_NAME="forum-$${VERSION}-$${TARGET}"; \
+	DIST_ROOT="$(ROOT)/dist"; \
+	PKG_DIR="$${DIST_ROOT}/$${OUT_NAME}"; \
+	ARCHIVE="$${DIST_ROOT}/$${OUT_NAME}.tar.gz"; \
+	echo "==> Packaging $${OUT_NAME}"; \
+	rm -rf "$${PKG_DIR}"; \
+	mkdir -p "$${PKG_DIR}/backend" "$${PKG_DIR}/frontend"; \
+	(cd "$(BACKEND)" && cargo build --release); \
+	cp "$(BACKEND)/target/release/forum-backend" "$${PKG_DIR}/backend/"; \
+	cp -R "$(BACKEND)/migrations" "$${PKG_DIR}/backend/migrations"; \
+	cp "$(BACKEND)/.env.example" "$${PKG_DIR}/backend/.env.example"; \
+	(cd "$(FRONTEND)" && { test -d node_modules || npm ci; } && npm run build); \
+	cp -R "$(FRONTEND)/dist" "$${PKG_DIR}/frontend/dist"; \
+	cp "$(FRONTEND)/package.json" "$${PKG_DIR}/frontend/package.json"; \
+	cp "$(FRONTEND)/package-lock.json" "$${PKG_DIR}/frontend/package-lock.json"; \
+	cp "$(FRONTEND)/.env.example" "$${PKG_DIR}/frontend/.env.example"; \
+	(cd "$${PKG_DIR}/frontend" && npm ci --omit=dev); \
+	cp "$(ROOT)/README.md" "$${PKG_DIR}/"; \
+	printf "%s\n" "#!/usr/bin/env bash" "set -euo pipefail" "cd \"\$$(dirname \"\$$0\")/backend\"" \
+	  "if [[ ! -f .env ]]; then cp .env.example .env; echo \"Created backend/.env from example\"; fi" \
+	  "set -a; source .env; set +a" "exec ./forum-backend" > "$${PKG_DIR}/run-backend.sh"; \
+	printf "%s\n" "#!/usr/bin/env bash" "set -euo pipefail" "cd \"\$$(dirname \"\$$0\")/frontend\"" \
+	  "export HOST=\"\$${HOST:-0.0.0.0}\" PORT=\"\$${PORT:-4321}\" NODE_ENV=production" \
+	  "if [[ -f .env ]]; then set -a; source .env; set +a; fi" \
+	  "exec node ./dist/server/entry.mjs" > "$${PKG_DIR}/run-frontend.sh"; \
+	chmod +x "$${PKG_DIR}/run-backend.sh" "$${PKG_DIR}/run-frontend.sh" "$${PKG_DIR}/backend/forum-backend"; \
+	mkdir -p "$${DIST_ROOT}"; \
+	tar -C "$${DIST_ROOT}" -czf "$${ARCHIVE}" "$${OUT_NAME}"; \
+	if command -v shasum >/dev/null; then (cd "$${DIST_ROOT}" && shasum -a 256 "$${OUT_NAME}.tar.gz" > "$${OUT_NAME}.tar.gz.sha256"); \
+	elif command -v sha256sum >/dev/null; then (cd "$${DIST_ROOT}" && sha256sum "$${OUT_NAME}.tar.gz" > "$${OUT_NAME}.tar.gz.sha256"); fi; \
+	echo "==> Done: $${ARCHIVE}"'
 
 docker-build: ## Build backend + frontend images
 	docker compose --profile app build

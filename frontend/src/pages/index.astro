@@ -1,70 +1,105 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCookieHeader, getMe, listCategories } from '../lib/api';
+import { getCookieHeader, getMe, listChildren, listRootCategories } from '../lib/api';
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
-const user = await getMe(cookie);
 
-let categories: Category[] = [];
+type CommunityRow = {
+  root: Category;
+  children: Category[];
+};
+
+let user: Awaited<ReturnType<typeof getMe>> = null;
+let rows: CommunityRow[] = [];
 let error: string | null = null;
+
 try {
-  categories = await listCategories(cookie);
+  const [me, roots] = await Promise.all([getMe(cookie), listRootCategories(cookie)]);
+  user = me;
+  rows = await Promise.all(
+    roots.map(async (root) => {
+      let children: Category[] = [];
+      try {
+        children = await listChildren(root.slug, cookie);
+      } catch {
+        children = [];
+      }
+      return { root, children };
+    }),
+  );
 } catch (e) {
-  error = e instanceof Error ? e.message : 'Could not load categories';
+  error = e instanceof Error ? e.message : 'Could not load communities';
+  if (!user) user = await getMe(cookie).catch(() => null);
 }
 ---
 
-<BaseLayout title="Community" user={user}>
-  <section class="page-intro">
-    <h1>Community</h1>
-    <p>Find answers. Ask questions. Connect with others.</p>
-  </section>
+<BaseLayout title="Browse Communities" user={user} active="browse">
+  <div class="browse-hero">
+    <h1>Browse Communities</h1>
+  </div>
 
   {
     error ? (
-      <div class="alert">{error}. Is the API running on port 3000?</div>
+      <div class="alert">{error}. Start the API on port 3000.</div>
+    ) : rows.length === 0 ? (
+      <div class="empty">
+        <p>No communities yet.</p>
+        {user ? (
+          <p style="margin-top:12px">
+            <a class="btn btn-primary" href="/categories/new">
+              Create a community
+            </a>
+          </p>
+        ) : (
+          <p style="margin-top:12px">
+            <a href="/login">Sign in</a> to create the first community.
+          </p>
+        )}
+      </div>
     ) : (
-      <div class="panel">
-        <div class="panel__head">
-          <h2>Topics</h2>
+      <>
+        <div class="toolbar-row">
           {user && (
-            <a class="btn btn-secondary" href="/categories/new">
-              New topic
+            <a class="btn btn-secondary btn-sm" href="/categories/new">
+              New community
             </a>
           )}
         </div>
-        {categories.length === 0 ? (
-          <div class="empty">
-            No topics yet.
-            {user ? (
-              <>
-                {' '}
-                <a href="/categories/new">Create the first one</a>.
-              </>
-            ) : (
-              <>
-                {' '}
-                <a href="/login">Sign in</a> to create one.
-              </>
-            )}
-          </div>
-        ) : (
-          <ul class="list">
-            {categories.map((cat) => (
-              <li class="list-item">
-                <a class="row" href={`/categories/${cat.slug}`}>
-                  <div class="row__main">
-                    <div class="row__title">{cat.name}</div>
-                    <div class="row__meta">{cat.description || 'Discussions and questions'}</div>
-                  </div>
-                  <div class="row__aside">View</div>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+
+        <ul class="cat-list">
+          {rows.map(({ root, children }) => (
+            <li>
+              <a class="cat-list__parent" href={`/categories/${root.slug}`}>
+                {root.name}
+              </a>
+              {root.description && <p class="cat-list__parent-desc">{root.description}</p>}
+
+              {children.length > 0 ? (
+                <ul class="cat-list__chips">
+                  {children.map((sub) => (
+                    <li>
+                      <a class="cat-list__chip" href={`/categories/${sub.slug}`}>
+                        {sub.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p class="cat-list__empty">
+                  No subcategories
+                  {user && (
+                    <>
+                      {' '}
+                      · <a href={`/categories/new?parent=${root.slug}`}>add</a>
+                    </>
+                  )}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </>
     )
   }
 </BaseLayout>

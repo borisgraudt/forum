@@ -1,41 +1,72 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { getCookieHeader, getMe } from '../../lib/api';
+import CsrfInput from '../../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  getCookieHeader,
+  getMe,
+  listRootCategories,
+} from '../../lib/api';
+import type { Category } from '../../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
-if (!user) {
-  return Astro.redirect('/login');
-}
+if (!user) return Astro.redirect('/login');
 
+const parent = Astro.url.searchParams.get('parent') || '';
 const error = Astro.url.searchParams.get('error');
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
+
+let roots: Category[] = [];
+try {
+  roots = await listRootCategories(cookie);
+} catch {
+  /* empty */
+}
 ---
 
-<BaseLayout title="New topic" user={user}>
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/">Community</a>
-    <span class="sep">/</span>
-    <span>New topic</span>
-  </nav>
+<BaseLayout title={parent ? 'New subcategory' : 'New community'} user={user} active="browse">
+  <h1 class="page-title">{parent ? 'New subcategory' : 'New community'}</h1>
+  <p class="page-sub">
+    {
+      parent
+        ? 'Add a topic area under this community.'
+        : 'Top-level communities appear on the Browse grid (like product groups).'
+    }
+  </p>
 
-  <div class="panel" style="max-width: 520px">
-    <div class="panel__head">
-      <h2>New topic</h2>
+  {error && <div class="alert">{error}</div>}
+
+  <form method="POST" action="/api/categories" style="max-width:480px">
+    <CsrfInput token={csrf.token} />
+    {
+      parent ? (
+        <input type="hidden" name="parent_slug" value={parent} />
+      ) : (
+        <div class="field">
+          <label for="parent_slug">Parent (optional, for subcategory)</label>
+          <select id="parent_slug" name="parent_slug">
+            <option value="">— Top-level community —</option>
+            {roots.map((r) => (
+              <option value={r.slug}>{r.name}</option>
+            ))}
+          </select>
+        </div>
+      )
+    }
+    <div class="field">
+      <label for="name">Name</label>
+      <input id="name" name="name" required maxlength="80" placeholder="e.g. iPhone" />
     </div>
-    <form class="form" method="POST" action="/api/categories">
-      {error && <div class="alert">{error}</div>}
-      <div class="field">
-        <label for="name">Name</label>
-        <input id="name" name="name" type="text" required maxlength="80" />
-      </div>
-      <div class="field">
-        <label for="description">Description (optional)</label>
-        <textarea id="description" name="description" maxlength="500"></textarea>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Create</button>
-        <a class="btn btn-secondary" href="/">Cancel</a>
-      </div>
-    </form>
-  </div>
+    <div class="field">
+      <label for="description">Description (optional)</label>
+      <input id="description" name="description" maxlength="500" />
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Create</button>
+      <a class="btn btn-secondary" href={parent ? `/categories/${parent}` : '/'}>Cancel</a>
+    </div>
+  </form>
 </BaseLayout>

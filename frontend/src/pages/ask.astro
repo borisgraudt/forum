@@ -1,0 +1,133 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CsrfInput from '../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  getCookieHeader,
+  getMe,
+  listChildren,
+  listRootCategories,
+} from '../lib/api';
+import type { Category } from '../lib/types';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const preselect = Astro.url.searchParams.get('category') || '';
+const error = Astro.url.searchParams.get('error');
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
+
+let roots: Category[] = [];
+let leaves: Category[] = [];
+try {
+  roots = await listRootCategories(cookie);
+  const kidsByRoot = await Promise.all(
+    roots.map(async (root) => {
+      try {
+        return await listChildren(root.slug, cookie);
+      } catch {
+        return [] as Category[];
+      }
+    }),
+  );
+  for (let i = 0; i < roots.length; i++) {
+    const kids = kidsByRoot[i];
+    if (kids.length === 0) {
+      leaves.push(roots[i]);
+    } else {
+      leaves.push(...kids);
+    }
+  }
+} catch {
+  /* form still renders */
+}
+---
+
+<BaseLayout title="Ask a question" user={user} active="ask" flush>
+  <section class="ask-hero">
+    <h1>Ask a question.</h1>
+    <p>
+      Questions for the community should include information such as your device, software version,
+      and an explanation of the issue. Markdown is supported.
+    </p>
+  </section>
+
+  <div class="ask-body">
+    {error && <div class="alert">{error}</div>}
+
+    <form method="POST" action="/api/ask">
+      <CsrfInput token={csrf.token} />
+      <div class="ask-field">
+        <label for="category">Community / topic</label>
+        <div class="ask-select">
+          <select
+            id="category"
+            name="category"
+            required
+            class="ask-select__control"
+            aria-label="Community / topic"
+          >
+            <option value="" disabled selected={!preselect}> Select a topic </option>
+            {
+              leaves.map((c) => (
+                <option value={c.slug} selected={c.slug === preselect}>
+                  {c.name}
+                </option>
+              ))
+            }
+          </select>
+          <span class="ask-select__chevron" aria-hidden="true">
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+              <path
+                d="M1 1.5L6 6.5L11 1.5"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"></path>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="ask-field">
+        <label for="title">Title</label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          required
+          maxlength="200"
+          class="ask-input"
+          placeholder="Summarize your question"
+        />
+      </div>
+
+      <div class="ask-editor">
+        <textarea
+          name="body"
+          required
+          maxlength="50000"
+          placeholder="Markdown supported. Steps to reproduce help others answer. Don’t include personal information."
+        ></textarea>
+        <div class="ask-toolbar" aria-hidden="true">
+          <span>B</span>
+          <span>I</span>
+          <span>U</span>
+          <span>|</span>
+          <span>•••</span>
+        </div>
+      </div>
+      <p class="ask-hint">✦ Markdown is rendered safely. Review your title for accuracy.</p>
+
+      <div class="ask-actions">
+        <button class="btn btn-primary" type="submit">Continue</button>
+        <a class="btn btn-secondary" href="/">Cancel</a>
+      </div>
+    </form>
+  </div>
+</BaseLayout>
