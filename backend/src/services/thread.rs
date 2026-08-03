@@ -163,20 +163,15 @@ impl ThreadService {
     }
 
     pub async fn me_too_count(db: &SqlitePool, thread_id: i64) -> AppResult<i64> {
-        let n = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM thread_me_too WHERE thread_id = ?",
-        )
-        .bind(thread_id)
-        .fetch_one(db)
-        .await?;
+        let n =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM thread_me_too WHERE thread_id = ?")
+                .bind(thread_id)
+                .fetch_one(db)
+                .await?;
         Ok(n)
     }
 
-    pub async fn viewer_me_too(
-        db: &SqlitePool,
-        thread_id: i64,
-        user_id: i64,
-    ) -> AppResult<bool> {
+    pub async fn viewer_me_too(db: &SqlitePool, thread_id: i64, user_id: i64) -> AppResult<bool> {
         let n = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM thread_me_too WHERE thread_id = ? AND user_id = ?",
         )

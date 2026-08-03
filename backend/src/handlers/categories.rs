@@ -7,7 +7,7 @@ use validator::Validate;
 use crate::dto::{CategoryListResponse, CategoryResponse, CreateCategoryRequest};
 use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
-use crate::models::{User, UserRole};
+use crate::models::User;
 use crate::services::CategoryService;
 use crate::state::AppState;
 use crate::utils::{slugify, validation_error};
@@ -128,7 +128,7 @@ async fn create_category(
 
 fn require_admin(user: &User) -> AppResult<()> {
     match user.role_enum() {
-        Ok(UserRole::Admin) => Ok(()),
+        Ok(role) if role.is_admin() => Ok(()),
         _ => Err(AppError::Forbidden),
     }
 }

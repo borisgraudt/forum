@@ -14,7 +14,10 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
 
   const res = await fetch(
     `${API_BASE}/categories/${encodeURIComponent(slug)}/threads/${encodeURIComponent(threadSlug)}/me-too`,
-    { method, headers: { Cookie: headers.Cookie || '', 'X-CSRF-Token': headers['X-CSRF-Token'] || '' } },
+    {
+      method,
+      headers: { Cookie: headers.Cookie || '', 'X-CSRF-Token': headers['X-CSRF-Token'] || '' },
+    },
   );
 
   const dest = `/categories/${slug}/threads/${threadSlug}`;

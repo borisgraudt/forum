@@ -12,10 +12,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const back = String(form.get('back') || '/admin#categories');
 
   if (!categoryId) {
-    return redirect(
-      `/admin?error=${encodeURIComponent('Missing category')}#categories`,
-      303,
-    );
+    return redirect(`/admin?error=${encodeURIComponent('Missing category')}#categories`, 303);
   }
 
   if (action === 'delete') {

@@ -1,12 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import {
-  getCookieHeader,
-  getMe,
-  isAdmin,
-  listChildren,
-  listRootCategories,
-} from '../lib/api';
+import { getCookieHeader, getMe, isAdmin, listChildren, listRootCategories } from '../lib/api';
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);

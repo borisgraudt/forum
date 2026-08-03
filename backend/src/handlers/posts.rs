@@ -48,8 +48,7 @@ async fn list_posts(
     let offset = query.offset();
     // Keep soft-deleted placeholders so reply_to chain stays readable for staff? Show all with flag.
     let total = PostService::count_by_thread(&state.db, thread.id, true).await?;
-    let posts =
-        PostService::list_by_thread(&state.db, thread.id, limit, offset, true).await?;
+    let posts = PostService::list_by_thread(&state.db, thread.id, limit, offset, true).await?;
 
     let mut out = Vec::with_capacity(posts.len());
     for p in posts {
@@ -120,10 +119,7 @@ async fn update_post(
         return Err(AppError::NotFound);
     }
 
-    let is_staff = user
-        .role_enum()
-        .map(|r| r.is_staff())
-        .unwrap_or(false);
+    let is_staff = user.role_enum().map(|r| r.is_staff()).unwrap_or(false);
     if post.author_id != user.id && !is_staff {
         return Err(AppError::Forbidden);
     }

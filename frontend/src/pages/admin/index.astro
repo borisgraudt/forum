@@ -180,11 +180,13 @@ const parentName = (c: Category) => {
         <h2 id="cats-heading">Categories</h2>
         <div class="admin-section__actions">
           <a class="btn btn-primary btn-sm" href="/categories/new">New community</a>
-          {roots[0] && (
-            <a class="btn btn-secondary btn-sm" href={`/categories/new?parent=${roots[0].slug}`}>
-              New subcategory
-            </a>
-          )}
+          {
+            roots[0] && (
+              <a class="btn btn-secondary btn-sm" href={`/categories/new?parent=${roots[0].slug}`}>
+                New subcategory
+              </a>
+            )
+          }
         </div>
       </div>
 
@@ -254,9 +256,7 @@ const parentName = (c: Category) => {
                     <td>
                       <a href={`/categories/${c.slug}`}>{c.slug}</a>
                     </td>
-                    <td class="admin-table__muted">
-                      {c.parent_id == null ? '—' : parentName(c)}
-                    </td>
+                    <td class="admin-table__muted">{c.parent_id == null ? '—' : parentName(c)}</td>
                     <td>{c.topic_count ?? 0}</td>
                     <td class="admin-table__muted">{c.sort_order}</td>
                     <td>

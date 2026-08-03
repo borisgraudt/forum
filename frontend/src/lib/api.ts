@@ -236,10 +236,9 @@ export function isAdmin(user: UserPublic | null | undefined): boolean {
 }
 
 export async function getUserProfile(username: string, cookie?: string | null) {
-  const data = await request<{ profile: UserProfile }>(
-    `/users/${encodeURIComponent(username)}`,
-    { cookie },
-  );
+  const data = await request<{ profile: UserProfile }>(`/users/${encodeURIComponent(username)}`, {
+    cookie,
+  });
   return data.profile;
 }
 

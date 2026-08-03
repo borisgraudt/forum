@@ -65,8 +65,7 @@ try {
   if (user && thread) {
     try {
       const drafts = await listDrafts(cookie);
-      replyDraft =
-        drafts.find((d) => d.kind === 'reply' && d.thread_id === thread!.id) || null;
+      replyDraft = drafts.find((d) => d.kind === 'reply' && d.thread_id === thread!.id) || null;
     } catch {
       replyDraft = null;
     }
@@ -107,10 +106,8 @@ const ranked = [...visibleReplies]
     if (hb !== ha) return hb - ha;
     return a.id - b.id;
   });
-const topReply = ranked[0] && (ranked[0].helpful_count ?? 0) > 0 ? ranked[0] : ranked[0] ?? null;
-const restReplies = topReply
-  ? visibleReplies.filter((p) => p.id !== topReply.id)
-  : visibleReplies;
+const topReply = ranked[0] && (ranked[0].helpful_count ?? 0) > 0 ? ranked[0] : (ranked[0] ?? null);
+const restReplies = topReply ? visibleReplies.filter((p) => p.id !== topReply.id) : visibleReplies;
 
 const opAuthor = op ? authorLabel(op) : '';
 const canMod = isModerator(user);
@@ -118,9 +115,7 @@ const views = thread?.view_count ?? 0;
 const meTooCount = thread?.me_too_count ?? 0;
 const canMeToo = Boolean(user && thread && user.id !== thread.author_id);
 const replyToPost =
-  Number.isFinite(replyToId) && replyToId > 0
-    ? posts.find((p) => p.id === replyToId)
-    : undefined;
+  Number.isFinite(replyToId) && replyToId > 0 ? posts.find((p) => p.id === replyToId) : undefined;
 
 function bodyHtml(post: Post) {
   return post.body_html || post.body;
@@ -278,7 +273,10 @@ function canHelpful(post: Post) {
                 <button class="btn btn-primary btn-sm" type="submit">
                   Save
                 </button>
-                <a class="btn btn-secondary btn-sm" href={`/categories/${category.slug}/threads/${thread.slug}`}>
+                <a
+                  class="btn btn-secondary btn-sm"
+                  href={`/categories/${category.slug}/threads/${thread.slug}`}
+                >
                   Cancel
                 </a>
               </div>
@@ -329,7 +327,11 @@ function canHelpful(post: Post) {
 
         {topReply && (
           <article
-            class:list={['ad-post', 'ad-post--featured', { 'ad-post--deleted': topReply.is_deleted }]}
+            class:list={[
+              'ad-post',
+              'ad-post--featured',
+              { 'ad-post--deleted': topReply.is_deleted },
+            ]}
             id={`post-${topReply.id}`}
           >
             <header class="ad-post__head">
@@ -368,8 +370,7 @@ function canHelpful(post: Post) {
                   {historyEdits.map((ed) => (
                     <li>
                       <div class="ad-history__meta">
-                        {ed.editor_display_name || ed.editor_username} ·{' '}
-                        {formatWhen(ed.created_at)}
+                        {ed.editor_display_name || ed.editor_username} · {formatWhen(ed.created_at)}
                       </div>
                       <pre class="ad-history__body">{ed.body_before}</pre>
                     </li>
@@ -432,9 +433,7 @@ function canHelpful(post: Post) {
                           ↑
                         </span>
                         Helpful
-                        {(topReply.helpful_count ?? 0) > 0
-                          ? ` · ${topReply.helpful_count}`
-                          : ''}
+                        {(topReply.helpful_count ?? 0) > 0 ? ` · ${topReply.helpful_count}` : ''}
                       </button>
                     </form>
                   ) : (
@@ -443,9 +442,7 @@ function canHelpful(post: Post) {
                         ↑
                       </span>
                       Helpful
-                      {(topReply.helpful_count ?? 0) > 0
-                        ? ` · ${topReply.helpful_count}`
-                        : ''}
+                      {(topReply.helpful_count ?? 0) > 0 ? ` · ${topReply.helpful_count}` : ''}
                     </span>
                   )}
                   {!thread.is_locked && (
@@ -482,9 +479,7 @@ function canHelpful(post: Post) {
             const replyTarget = post.reply_to_post_id
               ? posts.find((p) => p.id === post.reply_to_post_id)
               : null;
-            const replyLabel = replyTarget
-              ? authorLabel(replyTarget)
-              : opAuthor;
+            const replyLabel = replyTarget ? authorLabel(replyTarget) : opAuthor;
             return (
               <article
                 class:list={['ad-post', { 'ad-post--deleted': post.is_deleted }]}
@@ -503,9 +498,7 @@ function canHelpful(post: Post) {
                       <a class="ad-post__name" href={authorHref(post.author_username)}>
                         {who}
                       </a>
-                      {post.author_id === op.author_id && (
-                        <span class="ad-post__role">Author</span>
-                      )}
+                      {post.author_id === op.author_id && <span class="ad-post__role">Author</span>}
                     </div>
                   </div>
                 </header>
@@ -687,7 +680,9 @@ function canHelpful(post: Post) {
                       required
                       maxlength="50000"
                       placeholder="Write a reply… Markdown supported."
-                    >{replyDraft?.body || ''}</textarea>
+                    >
+                      {replyDraft?.body || ''}
+                    </textarea>
                     <div class="ask-toolbar" aria-hidden="true">
                       <span>B</span>
                       <span>I</span>

@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::models::{
-    Category, Draft, PostEdit, PostViewJson, ThreadView, UserProfile, UserPublic,
-};
+use crate::models::{Category, Draft, PostEdit, PostViewJson, ThreadView, UserProfile, UserPublic};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateCategoryRequest {

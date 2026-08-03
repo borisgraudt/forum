@@ -1,13 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import CsrfInput from '../../components/CsrfInput.astro';
-import {
-  applySetCookies,
-  ensureCsrf,
-  getCookieHeader,
-  getMe,
-  getUserProfile,
-} from '../../lib/api';
+import { applySetCookies, ensureCsrf, getCookieHeader, getMe, getUserProfile } from '../../lib/api';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
@@ -77,15 +71,13 @@ const saved = Astro.url.searchParams.get('saved');
           class="ask-input settings-form__bio"
           maxlength="500"
           rows="4"
-          placeholder="A short public bio (optional)"
-        >{bio}</textarea>
+          placeholder="A short public bio (optional)">{bio}</textarea
+        >
       </div>
 
       <div class="ask-actions">
         <button class="btn btn-primary" type="submit">Save</button>
-        <a class="btn btn-secondary" href={`/u/${user.username}`}>
-          View profile
-        </a>
+        <a class="btn btn-secondary" href={`/u/${user.username}`}> View profile </a>
       </div>
     </form>
   </div>

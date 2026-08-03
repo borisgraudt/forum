@@ -102,12 +102,10 @@ impl PostService {
     }
 
     pub async fn helpful_count(db: &SqlitePool, post_id: i64) -> AppResult<i64> {
-        let n = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM post_helpful WHERE post_id = ?",
-        )
-        .bind(post_id)
-        .fetch_one(db)
-        .await?;
+        let n = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM post_helpful WHERE post_id = ?")
+            .bind(post_id)
+            .fetch_one(db)
+            .await?;
         Ok(n)
     }
 
@@ -277,11 +275,6 @@ impl PostService {
 
         tx.commit().await?;
         Ok(())
-    }
-
-    /// Hard delete (moderation). Prefer soft_delete for authors.
-    pub async fn delete(db: &SqlitePool, post_id: i64) -> AppResult<()> {
-        Self::soft_delete(db, post_id).await
     }
 
     pub async fn list_edits(db: &SqlitePool, post_id: i64) -> AppResult<Vec<PostEdit>> {

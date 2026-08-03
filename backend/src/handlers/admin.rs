@@ -10,7 +10,7 @@ use crate::dto::{
 };
 use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
-use crate::models::{User, UserPublic, UserRole};
+use crate::models::{User, UserPublic};
 use crate::services::{CategoryService, UserService};
 use crate::state::AppState;
 use crate::utils::validation_error;
@@ -68,13 +68,8 @@ async fn update_user(
         }
     }
 
-    let user = UserService::admin_update(
-        &state.db,
-        user_id,
-        body.role.as_deref(),
-        body.is_active,
-    )
-    .await?;
+    let user =
+        UserService::admin_update(&state.db, user_id, body.role.as_deref(), body.is_active).await?;
     Ok((StatusCode::OK, Json(user)))
 }
 
@@ -84,10 +79,7 @@ async fn list_categories(
 ) -> AppResult<(StatusCode, Json<CategoryListResponse>)> {
     require_admin(&user)?;
     let categories = CategoryService::list_all(&state.db).await?;
-    Ok((
-        StatusCode::OK,
-        Json(CategoryListResponse { categories }),
-    ))
+    Ok((StatusCode::OK, Json(CategoryListResponse { categories })))
 }
 
 async fn update_category(
@@ -118,14 +110,8 @@ async fn update_category(
         None
     };
 
-    let category = CategoryService::update(
-        &state.db,
-        category_id,
-        name,
-        description,
-        body.sort_order,
-    )
-    .await?;
+    let category =
+        CategoryService::update(&state.db, category_id, name, description, body.sort_order).await?;
 
     Ok((
         StatusCode::OK,
@@ -149,7 +135,7 @@ async fn delete_category(
 
 fn require_admin(user: &User) -> AppResult<()> {
     match user.role_enum() {
-        Ok(UserRole::Admin) => Ok(()),
+        Ok(role) if role.is_admin() => Ok(()),
         _ => Err(AppError::Forbidden),
     }
 }

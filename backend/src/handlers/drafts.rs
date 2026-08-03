@@ -35,9 +35,15 @@ async fn upsert_draft(
         &state.db,
         user.id,
         body.kind.trim(),
-        body.category_slug.as_deref().map(str::trim).filter(|s| !s.is_empty()),
+        body.category_slug
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
         body.thread_id,
-        body.title.as_deref().map(str::trim).filter(|s| !s.is_empty()),
+        body.title
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
         body.body.trim(),
     )
     .await?;

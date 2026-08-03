@@ -13,9 +13,7 @@ pub use category::Category;
 pub use draft::Draft;
 pub use post::{Post, PostEdit, PostView, PostViewJson};
 pub use thread::{Thread, ThreadView};
-pub use user::{
-    ProfilePostItem, ProfileThreadItem, User, UserProfile, UserPublic, UserRole,
-};
+pub use user::{ProfilePostItem, ProfileThreadItem, User, UserProfile, UserPublic, UserRole};
 
 // re-export for handlers that only need table rows
 

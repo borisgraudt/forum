@@ -1,9 +1,7 @@
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
-use crate::models::{
-    ProfilePostItem, ProfileThreadItem, User, UserProfile, UserPublic, UserRole,
-};
+use crate::models::{ProfilePostItem, ProfileThreadItem, User, UserProfile, UserPublic, UserRole};
 
 pub struct UserService;
 
@@ -187,15 +185,11 @@ impl UserService {
         is_active: Option<bool>,
     ) -> AppResult<UserPublic> {
         if role.is_none() && is_active.is_none() {
-            return Err(AppError::BadRequest(
-                "role or is_active is required".into(),
-            ));
+            return Err(AppError::BadRequest("role or is_active is required".into()));
         }
 
         if let Some(role) = role {
-            let _ = role
-                .parse::<UserRole>()
-                .map_err(|e| AppError::BadRequest(e))?;
+            let _ = role.parse::<UserRole>().map_err(AppError::BadRequest)?;
             sqlx::query(
                 r#"
                 UPDATE users
