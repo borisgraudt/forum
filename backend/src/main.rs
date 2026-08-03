@@ -21,7 +21,8 @@ use tracing_subscriber::EnvFilter;
 use crate::config::Config;
 use crate::error::AppResult;
 use crate::handlers::{
-    auth_router, categories_router, posts_router, search_router, threads_router,
+    admin_router, auth_router, categories_router, drafts_router, posts_router, search_router,
+    threads_router, users_router,
 };
 use crate::middleware::{CsrfLayer, RateLimitLayer, SecurityHeadersLayer};
 use crate::state::AppState;
@@ -90,7 +91,10 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
             Router::new()
                 .merge(threads_router())
                 .merge(posts_router())
-                .merge(search_router()),
+                .merge(search_router())
+                .merge(users_router())
+                .merge(drafts_router())
+                .nest("/admin", admin_router()),
         )
         .layer(TraceLayer::new_for_http())
         .layer(CsrfLayer)
@@ -501,10 +505,34 @@ mod tests {
     #[tokio::test]
     async fn forum_crud_category_thread_post_flow() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state.clone(), "http://localhost:4321").expect("router");
         let (cookie, csrf) = register_cookie(&app, "erin").await;
 
-        // Create category (auth)
+        // Categories are admin-only.
+        sqlx::query("UPDATE users SET role = 'admin' WHERE username = 'erin'")
+            .execute(&state.db)
+            .await
+            .expect("promote admin");
+
+        // Non-admin cannot create categories
+        let (user_cookie, user_csrf) = register_cookie(&app, "erin_user").await;
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/categories")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, &user_cookie)
+                    .header("x-csrf-token", &user_csrf)
+                    .body(json_body(serde_json::json!({ "name": "Nope" })))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        // Create category (admin)
         let response = app
             .clone()
             .oneshot(
@@ -612,10 +640,14 @@ mod tests {
     #[tokio::test]
     async fn create_thread_requires_auth() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state.clone(), "http://localhost:4321").expect("router");
         let (cookie, csrf) = register_cookie(&app, "frank").await;
+        sqlx::query("UPDATE users SET role = 'admin' WHERE username = 'frank'")
+            .execute(&state.db)
+            .await
+            .expect("promote admin");
 
-        let _ = app
+        let response = app
             .clone()
             .oneshot(
                 Request::builder()
@@ -629,6 +661,7 @@ mod tests {
             )
             .await
             .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
 
         let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
         let response = app

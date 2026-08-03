@@ -4,14 +4,16 @@
 //! already exercise them end-to-end against migrations.
 
 mod category;
+mod draft;
 mod post;
 mod thread;
 mod user;
 
 pub use category::Category;
-pub use post::{Post, PostView, PostViewJson};
+pub use draft::Draft;
+pub use post::{Post, PostEdit, PostView, PostViewJson};
 pub use thread::{Thread, ThreadView};
-pub use user::{User, UserPublic, UserRole};
+pub use user::{ProfilePostItem, ProfileThreadItem, User, UserProfile, UserPublic, UserRole};
 
 // re-export for handlers that only need table rows
 

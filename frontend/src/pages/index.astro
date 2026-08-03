@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCookieHeader, getMe, listChildren, listRootCategories } from '../lib/api';
+import { getCookieHeader, getMe, isAdmin, listChildren, listRootCategories } from '../lib/api';
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
@@ -45,22 +45,26 @@ try {
     ) : rows.length === 0 ? (
       <div class="empty">
         <p>No communities yet.</p>
-        {user ? (
+        {isAdmin(user) ? (
           <p style="margin-top:12px">
             <a class="btn btn-primary" href="/categories/new">
               Create a community
             </a>
           </p>
+        ) : user ? (
+          <p style="margin-top:12px" class="muted">
+            An admin will set up the first community.
+          </p>
         ) : (
           <p style="margin-top:12px">
-            <a href="/login">Sign in</a> to create the first community.
+            <a href="/login">Sign in</a> — communities are managed by admins.
           </p>
         )}
       </div>
     ) : (
       <>
         <div class="toolbar-row">
-          {user && (
+          {isAdmin(user) && (
             <a class="btn btn-secondary btn-sm" href="/categories/new">
               New community
             </a>

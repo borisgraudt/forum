@@ -178,6 +178,7 @@ mod tests {
             email: "a@b.c".into(),
             password_hash: "x".into(),
             display_name: None,
+            bio: None,
             role: "user".into(),
             is_active: true,
             created_at: "t".into(),

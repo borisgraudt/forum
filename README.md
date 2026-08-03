@@ -4,7 +4,7 @@ Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI
 
 Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-**Current version:** `0.2.0`
+**Current version:** `0.3.0`
 
 ---
 
@@ -116,12 +116,13 @@ Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community produ
 - Basic responsive CSS (not yet a full mobile product)
 
 ### v0.3 — Community product core
-- [ ] **Admin panel** (`/admin`): users, roles, categories, reports, site settings
-- [ ] **Me too / Helpful** real votes + rankings
-- [ ] **Quote / reply-to** specific posts
-- [ ] **Edit / delete** own content (+ soft-delete, edit history)
-- [ ] **User profiles** (avatar, bio, activity, reputation)
-- [ ] **Drafts** for ask/reply
+- [x] **Admin panel** (`/admin`): users, roles, deactivate + **categories** (create/edit/delete empty)
+- [x] **Categories** admin-only (communities + subcategories)
+- [x] **Me too / Helpful** real votes + rankings
+- [x] **Quote / reply-to** specific posts
+- [x] **Edit / delete** own content (+ soft-delete, edit history)
+- [x] **User profiles** (`/u/:user`, bio, reputation, recent activity; avatars later)
+- [x] **Drafts** for ask + reply
 
 ### v0.4 — Trust, safety, identity
 - [ ] **Report** + mod queue

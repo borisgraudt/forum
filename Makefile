@@ -1,5 +1,5 @@
 .PHONY: help dev dev-backend dev-frontend build lint lint-backend lint-frontend \
-	fmt fmt-check test test-backend migrate migrate-info db-create db-reset \
+	fmt fmt-check test test-backend test-smoke migrate migrate-info db-create db-reset \
 	audit audit-backend audit-frontend clean setup ci \
 	package docker-build docker-up docker-down release-dry
 
@@ -8,7 +8,7 @@ BACKEND := $(ROOT)/backend
 FRONTEND := $(ROOT)/frontend
 
 export DATABASE_URL ?= sqlite:$(BACKEND)/forum.db?mode=rwc
-export VERSION ?= 0.2.0
+export VERSION ?= 0.3.0
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | \
@@ -114,6 +114,9 @@ test: test-backend ## Run all tests
 
 test-backend: ## Backend unit/integration tests
 	cd $(BACKEND) && cargo test
+
+test-smoke: ## Smoke e2e (API + frontend BFF). Needs :3000 + :4321 up.
+	@bash $(ROOT)/scripts/smoke-e2e.sh
 
 migrate: ## Apply sqlx migrations
 	cd $(BACKEND) && sqlx database create || true

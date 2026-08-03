@@ -9,6 +9,7 @@ type Props = {
 const { user = null, active = null } = Astro.props;
 const display = user ? user.display_name || user.username : '';
 const initial = display ? display.slice(0, 1).toUpperCase() : '';
+const isAdmin = user?.role === 'admin';
 ---
 
 <header class="site-header">
@@ -35,6 +36,17 @@ const initial = display ? display.slice(0, 1).toUpperCase() : '';
                 <span class="profile-menu__who-name">{display}</span>
                 <span class="profile-menu__who-user">@{user.username}</span>
               </div>
+              <a class="profile-menu__link" href={`/u/${user.username}`} role="menuitem">
+                Profile
+              </a>
+              <a class="profile-menu__link" href="/settings/profile" role="menuitem">
+                Settings
+              </a>
+              {isAdmin && (
+                <a class="profile-menu__link" href="/admin" role="menuitem">
+                  Admin
+                </a>
+              )}
               <form method="POST" action="/logout" class="profile-menu__form">
                 <button type="submit" role="menuitem">
                   Sign out

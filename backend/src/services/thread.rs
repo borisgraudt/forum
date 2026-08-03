@@ -9,16 +9,20 @@ const THREAD_VIEW_SELECT: &str = r#"
         t.is_pinned, t.is_locked, t.post_count, t.view_count, t.last_post_at,
         t.created_at, t.updated_at,
         u.username AS author_username,
-        u.display_name AS author_display_name
+        u.display_name AS author_display_name,
+        (SELECT COUNT(*) FROM thread_me_too m WHERE m.thread_id = t.id) AS me_too_count
     FROM threads t
     INNER JOIN users u ON u.id = t.author_id
 "#;
 
 const POST_VIEW_SELECT: &str = r#"
     SELECT
-        p.id, p.thread_id, p.author_id, p.body, p.created_at, p.updated_at,
+        p.id, p.thread_id, p.author_id, p.body,
+        p.reply_to_post_id, p.deleted_at, p.edited_at,
+        p.created_at, p.updated_at,
         u.username AS author_username,
-        u.display_name AS author_display_name
+        u.display_name AS author_display_name,
+        (SELECT COUNT(*) FROM post_helpful h WHERE h.post_id = p.id) AS helpful_count
     FROM posts p
     INNER JOIN users u ON u.id = p.author_id
 "#;
@@ -156,6 +160,49 @@ impl ThreadService {
             .fetch_optional(db)
             .await?
             .ok_or(AppError::NotFound)
+    }
+
+    pub async fn me_too_count(db: &SqlitePool, thread_id: i64) -> AppResult<i64> {
+        let n =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM thread_me_too WHERE thread_id = ?")
+                .bind(thread_id)
+                .fetch_one(db)
+                .await?;
+        Ok(n)
+    }
+
+    pub async fn viewer_me_too(db: &SqlitePool, thread_id: i64, user_id: i64) -> AppResult<bool> {
+        let n = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM thread_me_too WHERE thread_id = ? AND user_id = ?",
+        )
+        .bind(thread_id)
+        .bind(user_id)
+        .fetch_one(db)
+        .await?;
+        Ok(n > 0)
+    }
+
+    pub async fn add_me_too(db: &SqlitePool, thread_id: i64, user_id: i64) -> AppResult<i64> {
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO thread_me_too (thread_id, user_id)
+            VALUES (?, ?)
+            "#,
+        )
+        .bind(thread_id)
+        .bind(user_id)
+        .execute(db)
+        .await?;
+        Self::me_too_count(db, thread_id).await
+    }
+
+    pub async fn remove_me_too(db: &SqlitePool, thread_id: i64, user_id: i64) -> AppResult<i64> {
+        sqlx::query("DELETE FROM thread_me_too WHERE thread_id = ? AND user_id = ?")
+            .bind(thread_id)
+            .bind(user_id)
+            .execute(db)
+            .await?;
+        Self::me_too_count(db, thread_id).await
     }
 
     pub async fn create_with_first_post(

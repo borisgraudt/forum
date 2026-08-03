@@ -5,8 +5,9 @@ use axum::{Json, Router};
 use validator::Validate;
 
 use crate::dto::{CategoryListResponse, CategoryResponse, CreateCategoryRequest};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
+use crate::models::User;
 use crate::services::CategoryService;
 use crate::state::AppState;
 use crate::utils::{slugify, validation_error};
@@ -63,16 +64,16 @@ async fn list_children(
 
 async fn create_category(
     State(state): State<AppState>,
-    AuthUser(_user): AuthUser,
+    AuthUser(user): AuthUser,
     Json(body): Json<CreateCategoryRequest>,
 ) -> AppResult<(StatusCode, Json<CategoryResponse>)> {
+    // Communities and subcategories are admin-managed (not open self-serve).
+    require_admin(&user)?;
     body.validate().map_err(validation_error)?;
 
     let name = body.name.trim().to_string();
     if name.is_empty() {
-        return Err(crate::error::AppError::BadRequest(
-            "name is required".into(),
-        ));
+        return Err(AppError::BadRequest("name is required".into()));
     }
 
     let slug = body
@@ -123,4 +124,11 @@ async fn create_category(
             parent: None,
         }),
     ))
+}
+
+fn require_admin(user: &User) -> AppResult<()> {
+    match user.role_enum() {
+        Ok(role) if role.is_admin() => Ok(()),
+        _ => Err(AppError::Forbidden),
+    }
 }
