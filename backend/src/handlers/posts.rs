@@ -57,7 +57,9 @@ async fn list_posts(
         } else {
             false
         };
-        out.push(PostViewJson::from_view(p, voted));
+        let mut json = PostViewJson::from_view(p, voted);
+        enrich_post(&state, &mut json).await?;
+        out.push(json);
     }
 
     Ok((
@@ -69,6 +71,27 @@ async fn list_posts(
             offset,
         }),
     ))
+}
+
+async fn enrich_post(state: &AppState, json: &mut PostViewJson) -> AppResult<()> {
+    if json.is_deleted {
+        return Ok(());
+    }
+    let atts = crate::services::MediaService::list_for_post(&state.db, json.id).await?;
+    json.attachments = atts
+        .into_iter()
+        .map(crate::models::AttachmentJson::from)
+        .collect();
+
+    // Only cached embeds — never block list on network (fast path).
+    for url in crate::services::EmbedService::extract_urls(&json.body, 3) {
+        if let Ok(Some(e)) = crate::services::EmbedService::get_cached(&state.db, &url).await {
+            if e.status == "ok" {
+                json.embeds.push(e);
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn create_post(
@@ -97,12 +120,25 @@ async fn create_post(
         body.reply_to_post_id,
     )
     .await?;
-    Ok((
-        StatusCode::CREATED,
-        Json(PostResponse {
-            post: PostViewJson::from(post),
-        }),
-    ))
+
+    if let Some(ids) = body.attachment_ids.as_ref() {
+        if !ids.is_empty() {
+            crate::services::MediaService::link_to_post(&state.db, post.id, ids, user.id).await?;
+        }
+    }
+
+    // Prefetch link embeds in background (don't block response — mega-fast path).
+    let db = state.db.clone();
+    let body_for_embed = body_text.clone();
+    tokio::spawn(async move {
+        for url in crate::services::EmbedService::extract_urls(&body_for_embed, 3) {
+            let _ = crate::services::EmbedService::get_or_fetch(&db, &url).await;
+        }
+    });
+
+    let mut json = PostViewJson::from(post);
+    enrich_post(&state, &mut json).await?;
+    Ok((StatusCode::CREATED, Json(PostResponse { post: json })))
 }
 
 async fn update_post(

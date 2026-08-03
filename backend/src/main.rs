@@ -21,10 +21,11 @@ use tracing_subscriber::EnvFilter;
 use crate::config::Config;
 use crate::error::AppResult;
 use crate::handlers::{
-    admin_router, auth_router, categories_router, drafts_router, moderation_router, posts_router,
-    search_router, threads_router, users_router,
+    admin_router, auth_router, categories_router, drafts_router, media_public_router, media_router,
+    moderation_router, posts_router, search_router, threads_router, users_router,
 };
 use crate::middleware::{CsrfLayer, RateLimitLayer, SecurityHeadersLayer};
+use crate::services::StorageService;
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -43,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = db::connect(&config.database_url).await?;
     db::migrate(&pool).await?;
+    StorageService::ensure_dirs(&config.data_dir).await?;
 
     let addr = config.socket_addr()?;
     let state = AppState::new(config.clone(), pool);
@@ -84,6 +86,8 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
     Ok(Router::new()
         .route("/health", get(health))
         .route("/api/v1/health", get(health))
+        // Immutable media: long-cache, no CSRF (GET only).
+        .merge(media_public_router())
         .nest("/api/v1/auth", auth_router())
         .nest("/api/v1/categories", categories_router())
         .nest(
@@ -94,6 +98,7 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
                 .merge(search_router())
                 .merge(users_router())
                 .merge(drafts_router())
+                .merge(media_router())
                 .nest("/mod", moderation_router())
                 .nest("/admin", admin_router()),
         )
@@ -166,6 +171,8 @@ mod tests {
             cookie_secure: false,
             cors_origin: "http://localhost:4321".into(),
             rust_log: "error".into(),
+            data_dir: std::env::temp_dir().join(format!("forum-test-{}", std::process::id())),
+            public_origin: "http://localhost:4321".into(),
         };
         let pool = db::connect(&config.database_url)
             .await

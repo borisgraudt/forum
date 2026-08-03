@@ -29,6 +29,7 @@ pub struct PostView {
     pub updated_at: String,
     pub author_username: String,
     pub author_display_name: Option<String>,
+    pub author_avatar_key: Option<String>,
     pub helpful_count: i64,
 }
 
@@ -47,8 +48,13 @@ pub struct PostViewJson {
     pub updated_at: String,
     pub author_username: String,
     pub author_display_name: Option<String>,
+    pub author_avatar_url: Option<String>,
     pub helpful_count: i64,
     pub viewer_marked_helpful: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<crate::models::AttachmentJson>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub embeds: Vec<crate::services::embed::LinkEmbed>,
 }
 
 impl PostViewJson {
@@ -77,8 +83,11 @@ impl PostViewJson {
             updated_at: p.updated_at,
             author_username: p.author_username,
             author_display_name: p.author_display_name,
+            author_avatar_url: p.author_avatar_key.as_ref().map(|k| format!("/media/{k}")),
             helpful_count: p.helpful_count,
             viewer_marked_helpful,
+            attachments: Vec::new(),
+            embeds: Vec::new(),
         }
     }
 }

@@ -3,6 +3,7 @@ import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import CsrfInput from '../../../../components/CsrfInput.astro';
 import {
   ApiRequestError,
+  API_ORIGIN,
   applySetCookies,
   authorLabel,
   ensureCsrf,
@@ -16,6 +17,7 @@ import {
   listPostEdits,
   listPosts,
   getThread,
+  mediaUrl,
 } from '../../../../lib/api';
 import type { Category, Draft, Post, PostEdit, Thread } from '../../../../lib/types';
 
@@ -119,7 +121,14 @@ const replyToPost =
   Number.isFinite(replyToId) && replyToId > 0 ? posts.find((p) => p.id === replyToId) : undefined;
 
 function bodyHtml(post: Post) {
-  return post.body_html || post.body;
+  let h = post.body_html || post.body || '';
+  // Markdown images use /media/* on API host — rewrite for browser.
+  h = h.replace(/(src|href)="\/media\//g, `$1="${API_ORIGIN}/media/`);
+  return h;
+}
+
+function avatarSrc(url?: string | null) {
+  return mediaUrl(url);
 }
 
 function replyHref(postId?: number) {
@@ -234,7 +243,39 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
           {op.is_deleted ? (
             <p class="ad-post__deleted">This post was deleted.</p>
           ) : (
-            <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
+            <>
+              <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
+              {(op.attachments?.length ?? 0) > 0 && (
+                <div class="post-media">
+                  {op.attachments!.map((a) => (
+                    <a href={mediaUrl(a.url)!} target="_blank" rel="noopener">
+                      <img
+                        src={mediaUrl(a.thumb_url || a.url)!}
+                        alt={a.original_name || ''}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
+              {(op.embeds?.length ?? 0) > 0 && (
+                <div class="embed-list">
+                  {op.embeds!.map((e) => (
+                    <a class="embed-card" href={e.url} target="_blank" rel="noopener noreferrer">
+                      {e.image_url && (
+                        <img class="embed-card__img" src={e.image_url} alt="" loading="lazy" />
+                      )}
+                      <span class="embed-card__body">
+                        {e.site_name && <span class="embed-card__site">{e.site_name}</span>}
+                        <span class="embed-card__title">{e.title || e.url}</span>
+                        {e.description && <span class="embed-card__desc">{e.description}</span>}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <p class="ad-post__posted">
             Posted on {formatWhen(op.created_at)}
@@ -703,6 +744,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
               method="POST"
               action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
               id="reply-form"
+              data-composer
             >
               <CsrfInput token={csrfToken} />
               {replyDraft && <input type="hidden" name="draft_id" value={String(replyDraft.id)} />}
@@ -711,7 +753,11 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
               )}
               <div class="ad-reply__box">
                 <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
-                  {initials(user.display_name || user.username)}
+                  {user.avatar_url ? (
+                    <img src={avatarSrc(user.avatar_url)!} alt="" width="40" height="40" />
+                  ) : (
+                    initials(user.display_name || user.username)
+                  )}
                 </div>
                 <div class="ad-reply__editor-wrap">
                   <div class="ask-editor ad-reply__editor">
@@ -719,15 +765,10 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                       name="body"
                       required
                       maxlength="50000"
-                      placeholder="Write a reply… Markdown supported."
+                      placeholder="Write a reply… Markdown, @mentions, paste images."
                     >
                       {replyDraft?.body || ''}
                     </textarea>
-                    <div class="ask-toolbar" aria-hidden="true">
-                      <span>B</span>
-                      <span>I</span>
-                      <span>U</span>
-                    </div>
                   </div>
                   <div class="ad-reply__actions">
                     <button class="btn btn-primary" type="submit">

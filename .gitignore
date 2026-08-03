@@ -37,3 +37,4 @@ tmp/
 # Release packages
 dist/
 
+backend/data/
