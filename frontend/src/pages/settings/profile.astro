@@ -1,0 +1,92 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CsrfInput from '../../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  getCookieHeader,
+  getMe,
+  getUserProfile,
+} from '../../lib/api';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
+
+let bio = user.bio ?? '';
+try {
+  const profile = await getUserProfile(user.username, cookie);
+  bio = profile.user.bio ?? '';
+} catch {
+  /* fall back to /me fields */
+}
+
+const error = Astro.url.searchParams.get('error');
+const saved = Astro.url.searchParams.get('saved');
+---
+
+<BaseLayout title="Edit profile" user={user} active={null}>
+  <div class="settings-page">
+    <h1 class="settings-page__title">Edit profile</h1>
+    <p class="settings-page__lead">
+      Public display name and short bio. Avatars arrive in a later release.
+    </p>
+
+    {error && <div class="alert">{error}</div>}
+    {saved && <div class="alert alert--ok">Profile saved.</div>}
+
+    <form method="POST" action="/api/profile" class="settings-form">
+      <CsrfInput token={csrf.token} />
+
+      <div class="ask-field">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          type="text"
+          class="ask-input"
+          value={user.username}
+          disabled
+          aria-describedby="username-hint"
+        />
+        <p id="username-hint" class="ask-hint">Username cannot be changed yet.</p>
+      </div>
+
+      <div class="ask-field">
+        <label for="display_name">Display name</label>
+        <input
+          id="display_name"
+          name="display_name"
+          type="text"
+          class="ask-input"
+          maxlength="64"
+          value={user.display_name || ''}
+          placeholder="How you appear on posts"
+        />
+      </div>
+
+      <div class="ask-field">
+        <label for="bio">Bio</label>
+        <textarea
+          id="bio"
+          name="bio"
+          class="ask-input settings-form__bio"
+          maxlength="500"
+          rows="4"
+          placeholder="A short public bio (optional)"
+        >{bio}</textarea>
+      </div>
+
+      <div class="ask-actions">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-secondary" href={`/u/${user.username}`}>
+          View profile
+        </a>
+      </div>
+    </form>
+  </div>
+</BaseLayout>

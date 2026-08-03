@@ -1,18 +1,19 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
+use validator::Validate;
 
 use crate::dto::{
     CreateThreadRequest, ListQuery, ThreadListResponse, ThreadResponse, UpdateThreadRequest,
+    VoteCountResponse,
 };
 use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
+use crate::middleware::{AuthUser, OptionalAuthUser};
 use crate::models::{PostViewJson, UserRole};
 use crate::services::{CategoryService, ThreadService};
 use crate::state::AppState;
 use crate::utils::{slugify, validation_error};
-use validator::Validate;
 
 pub fn threads_router() -> Router<AppState> {
     Router::new()
@@ -23,6 +24,10 @@ pub fn threads_router() -> Router<AppState> {
         .route(
             "/categories/{category_slug}/threads/{thread_slug}",
             get(get_thread).patch(update_thread),
+        )
+        .route(
+            "/categories/{category_slug}/threads/{thread_slug}/me-too",
+            post(add_me_too).delete(remove_me_too),
         )
 }
 
@@ -49,19 +54,25 @@ async fn list_threads(
 
 async fn get_thread(
     State(state): State<AppState>,
+    OptionalAuthUser(viewer): OptionalAuthUser,
     Path((category_slug, thread_slug)): Path<(String, String)>,
 ) -> AppResult<(StatusCode, Json<ThreadResponse>)> {
     let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
     let thread =
         ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
-    // Count a view on each successful fetch.
     ThreadService::increment_views(&state.db, thread.id).await?;
     let thread =
         ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    let viewer_me_too = if let Some(u) = viewer {
+        ThreadService::viewer_me_too(&state.db, thread.id, u.id).await?
+    } else {
+        false
+    };
     Ok((
         StatusCode::OK,
         Json(ThreadResponse {
             thread,
+            viewer_me_too,
             first_post: None,
         }),
     ))
@@ -108,6 +119,7 @@ async fn create_thread(
         StatusCode::CREATED,
         Json(ThreadResponse {
             thread,
+            viewer_me_too: false,
             first_post: Some(PostViewJson::from(first_post)),
         }),
     ))
@@ -132,7 +144,49 @@ async fn update_thread(
         StatusCode::OK,
         Json(ThreadResponse {
             thread,
+            viewer_me_too: false,
             first_post: None,
+        }),
+    ))
+}
+
+async fn add_me_too(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path((category_slug, thread_slug)): Path<(String, String)>,
+) -> AppResult<(StatusCode, Json<VoteCountResponse>)> {
+    let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    if thread.author_id == user.id {
+        return Err(AppError::BadRequest(
+            "cannot Me too your own question".into(),
+        ));
+    }
+    let count = ThreadService::add_me_too(&state.db, thread.id, user.id).await?;
+    Ok((
+        StatusCode::OK,
+        Json(VoteCountResponse {
+            count,
+            viewer_voted: true,
+        }),
+    ))
+}
+
+async fn remove_me_too(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path((category_slug, thread_slug)): Path<(String, String)>,
+) -> AppResult<(StatusCode, Json<VoteCountResponse>)> {
+    let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    let count = ThreadService::remove_me_too(&state.db, thread.id, user.id).await?;
+    Ok((
+        StatusCode::OK,
+        Json(VoteCountResponse {
+            count,
+            viewer_voted: false,
         }),
     ))
 }

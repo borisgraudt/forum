@@ -6,6 +6,7 @@ import {
   ensureCsrf,
   getCookieHeader,
   getMe,
+  isAdmin,
   listRootCategories,
 } from '../../lib/api';
 import type { Category } from '../../lib/types';
@@ -13,6 +14,9 @@ import type { Category } from '../../lib/types';
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
 if (!user) return Astro.redirect('/login');
+if (!isAdmin(user)) {
+  return new Response(null, { status: 403, statusText: 'Forbidden' });
+}
 
 const parent = Astro.url.searchParams.get('parent') || '';
 const error = Astro.url.searchParams.get('error');
@@ -32,8 +36,8 @@ try {
   <p class="page-sub">
     {
       parent
-        ? 'Add a topic area under this community.'
-        : 'Top-level communities appear on the Browse grid (like product groups).'
+        ? 'Add a topic area under this community. Admin only.'
+        : 'Top-level communities appear on Browse. Admin only.'
     }
   </p>
 
@@ -66,7 +70,9 @@ try {
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" type="submit">Create</button>
-      <a class="btn btn-secondary" href={parent ? `/categories/${parent}` : '/'}>Cancel</a>
+      <a class="btn btn-secondary" href={parent ? `/categories/${parent}` : '/admin#categories'}
+        >Cancel</a
+      >
     </div>
   </form>
 </BaseLayout>

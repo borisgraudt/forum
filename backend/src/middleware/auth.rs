@@ -43,3 +43,18 @@ impl FromRequestParts<AppState> for AuthUser {
             .ok_or(AppError::Unauthorized)
     }
 }
+
+/// Optional session: `None` when anonymous (not an error).
+#[derive(Debug, Clone)]
+pub struct OptionalAuthUser(pub Option<User>);
+
+impl FromRequestParts<AppState> for OptionalAuthUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(OptionalAuthUser(load_user_from_jar(parts, state).await?))
+    }
+}

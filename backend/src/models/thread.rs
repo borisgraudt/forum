@@ -33,4 +33,21 @@ pub struct ThreadView {
     pub updated_at: String,
     pub author_username: String,
     pub author_display_name: Option<String>,
+    pub me_too_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ThreadViewJson {
+    #[serde(flatten)]
+    pub thread: ThreadView,
+    pub viewer_me_too: bool,
+}
+
+impl From<ThreadView> for ThreadViewJson {
+    fn from(thread: ThreadView) -> Self {
+        Self {
+            thread,
+            viewer_me_too: false,
+        }
+    }
 }

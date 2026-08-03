@@ -7,9 +7,10 @@ import {
   getCookieHeader,
   getMe,
   listChildren,
+  listDrafts,
   listRootCategories,
 } from '../lib/api';
-import type { Category } from '../lib/types';
+import type { Category, Draft } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
@@ -19,11 +20,14 @@ if (!user) {
 
 const preselect = Astro.url.searchParams.get('category') || '';
 const error = Astro.url.searchParams.get('error');
+const draftSaved = Astro.url.searchParams.get('draft') === 'saved';
 const csrf = await ensureCsrf(cookie);
 applySetCookies(Astro.response, csrf.setCookies);
 
 let roots: Category[] = [];
 let leaves: Category[] = [];
+let draft: Draft | null = null;
+
 try {
   roots = await listRootCategories(cookie);
   const kidsByRoot = await Promise.all(
@@ -46,6 +50,24 @@ try {
 } catch {
   /* form still renders */
 }
+
+try {
+  const drafts = await listDrafts(cookie);
+  // Prefer draft matching preselected category, else latest thread draft.
+  const threadDrafts = drafts.filter((d) => d.kind === 'thread');
+  draft =
+    (preselect
+      ? threadDrafts.find((d) => d.category_slug === preselect)
+      : undefined) ||
+    threadDrafts[0] ||
+    null;
+} catch {
+  draft = null;
+}
+
+const selectedCategory = preselect || draft?.category_slug || '';
+const titleValue = draft?.title || '';
+const bodyValue = draft?.body || '';
 ---
 
 <BaseLayout title="Ask a question" user={user} active="ask" flush>
@@ -59,9 +81,14 @@ try {
 
   <div class="ask-body">
     {error && <div class="alert">{error}</div>}
+    {draftSaved && <div class="alert alert--ok">Draft saved.</div>}
+    {draft && !draftSaved && (
+      <div class="alert alert--ok">Restored your draft from {draft.updated_at.slice(0, 10)}.</div>
+    )}
 
-    <form method="POST" action="/api/ask">
+    <form method="POST" action="/api/ask" id="ask-form">
       <CsrfInput token={csrf.token} />
+      {draft && <input type="hidden" name="draft_id" value={String(draft.id)} />}
       <div class="ask-field">
         <label for="category">Community / topic</label>
         <div class="ask-select">
@@ -72,10 +99,10 @@ try {
             class="ask-select__control"
             aria-label="Community / topic"
           >
-            <option value="" disabled selected={!preselect}> Select a topic </option>
+            <option value="" disabled selected={!selectedCategory}> Select a topic </option>
             {
               leaves.map((c) => (
-                <option value={c.slug} selected={c.slug === preselect}>
+                <option value={c.slug} selected={c.slug === selectedCategory}>
                   {c.name}
                 </option>
               ))
@@ -104,6 +131,7 @@ try {
           maxlength="200"
           class="ask-input"
           placeholder="Summarize your question"
+          value={titleValue}
         />
       </div>
 
@@ -113,7 +141,7 @@ try {
           required
           maxlength="50000"
           placeholder="Markdown supported. Steps to reproduce help others answer. Don’t include personal information."
-        ></textarea>
+        >{bodyValue}</textarea>
         <div class="ask-toolbar" aria-hidden="true">
           <span>B</span>
           <span>I</span>
@@ -126,8 +154,45 @@ try {
 
       <div class="ask-actions">
         <button class="btn btn-primary" type="submit">Continue</button>
+        <button
+          class="btn btn-secondary"
+          type="submit"
+          formaction="/api/drafts"
+          formnovalidate
+        >
+          Save draft
+        </button>
+        {draft && (
+          <button
+            class="btn btn-secondary"
+            type="submit"
+            formaction="/api/drafts"
+            name="action"
+            value="delete"
+            formnovalidate
+          >
+            Discard draft
+          </button>
+        )}
         <a class="btn btn-secondary" href="/">Cancel</a>
       </div>
+      <input type="hidden" name="kind" value="thread" />
+      <input type="hidden" name="back" value="/ask" />
+      {/* category_slug for draft upsert is mirrored from select via name on save */}
+      <input type="hidden" name="category_slug" id="draft-category-slug" value={selectedCategory} />
     </form>
   </div>
 </BaseLayout>
+
+<script>
+  const form = document.getElementById('ask-form');
+  const select = document.getElementById('category') as HTMLSelectElement | null;
+  const hidden = document.getElementById('draft-category-slug') as HTMLInputElement | null;
+  if (form && select && hidden) {
+    const sync = () => {
+      hidden.value = select.value;
+    };
+    select.addEventListener('change', sync);
+    sync();
+  }
+</script>

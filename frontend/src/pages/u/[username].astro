@@ -1,0 +1,141 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {
+  ApiRequestError,
+  authorLabel,
+  formatWhen,
+  getCookieHeader,
+  getMe,
+  getUserProfile,
+  initials,
+} from '../../lib/api';
+import type { UserProfile } from '../../lib/types';
+
+const { username } = Astro.params;
+if (!username) return Astro.redirect('/');
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+
+let profile: UserProfile | null = null;
+let error: string | null = null;
+
+try {
+  profile = await getUserProfile(username, cookie);
+} catch (e) {
+  if (e instanceof ApiRequestError && e.status === 404) {
+    return new Response(null, { status: 404, statusText: 'Not Found' });
+  }
+  error = e instanceof Error ? e.message : 'Could not load profile';
+}
+
+const p = profile?.user;
+const isSelf = Boolean(user && p && user.id === p.id);
+const display = p ? p.display_name || p.username : username;
+const recentThreads = profile?.recent_threads ?? [];
+const recentPosts = profile?.recent_posts ?? [];
+---
+
+<BaseLayout title={display} user={user} active={null}>
+  {
+    error || !profile || !p ? (
+      <div class="alert">{error || 'Not found'}</div>
+    ) : (
+      <div class="profile-page">
+        <header class="profile-hero">
+          <div class="profile-hero__avatar" aria-hidden="true">
+            {initials(display)}
+          </div>
+          <div class="profile-hero__meta">
+            <h1 class="profile-hero__name">{display}</h1>
+            <p class="profile-hero__handle">@{p.username}</p>
+            {p.role !== 'user' && <span class="profile-hero__badge">{p.role}</span>}
+            {p.bio && <p class="profile-hero__bio">{p.bio}</p>}
+            <p class="profile-hero__joined">Joined {formatWhen(p.created_at)}</p>
+            {isSelf && (
+              <p class="profile-hero__actions">
+                <a class="btn btn-secondary btn-sm" href="/settings/profile">
+                  Edit profile
+                </a>
+              </p>
+            )}
+          </div>
+        </header>
+
+        <dl class="profile-stats">
+          <div class="profile-stats__item">
+            <dt>Reputation</dt>
+            <dd>{profile.reputation}</dd>
+          </div>
+          <div class="profile-stats__item">
+            <dt>Helpful</dt>
+            <dd>{profile.helpful_received}</dd>
+          </div>
+          <div class="profile-stats__item">
+            <dt>Topics</dt>
+            <dd>{profile.thread_count}</dd>
+          </div>
+          <div class="profile-stats__item">
+            <dt>Posts</dt>
+            <dd>{profile.post_count}</dd>
+          </div>
+        </dl>
+
+        <section class="profile-activity" aria-labelledby="topics-heading">
+          <h2 id="topics-heading" class="profile-activity__title">
+            Recent topics
+          </h2>
+          {recentThreads.length === 0 ? (
+            <p class="profile-activity__empty">No topics yet.</p>
+          ) : (
+            <ul class="profile-activity__list">
+              {recentThreads.map((t) => (
+                <li>
+                  <a href={`/categories/${t.category_slug}/threads/${t.slug}`}>{t.title}</a>
+                  <span class="profile-activity__meta">
+                    {t.category_name} · {formatWhen(t.created_at)} · {Math.max(0, t.post_count - 1)}{' '}
+                    {Math.max(0, t.post_count - 1) === 1 ? 'reply' : 'replies'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section class="profile-activity" aria-labelledby="posts-heading">
+          <h2 id="posts-heading" class="profile-activity__title">
+            Recent replies
+          </h2>
+          {recentPosts.length === 0 ? (
+            <p class="profile-activity__empty">No replies yet.</p>
+          ) : (
+            <ul class="profile-activity__list">
+              {recentPosts.map((post) => (
+                <li>
+                  <a
+                    href={`/categories/${post.category_slug}/threads/${post.thread_slug}#post-${post.id}`}
+                  >
+                    {post.thread_title}
+                  </a>
+                  <span class="profile-activity__meta">{formatWhen(post.created_at)}</span>
+                  <p class="profile-activity__preview">{post.body_preview}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <p class="profile-note">
+          Showing public activity for{' '}
+          <strong>
+            {authorLabel({
+              author_username: p.username,
+              author_display_name: p.display_name,
+            })}
+          </strong>
+          . Avatars arrive later.
+        </p>
+      </div>
+    )
+  }
+</BaseLayout>

@@ -1,11 +1,17 @@
+pub mod admin;
 pub mod auth;
 pub mod categories;
+pub mod drafts;
 pub mod posts;
 pub mod search;
 pub mod threads;
+pub mod users;
 
+pub use admin::admin_router;
 pub use auth::auth_router;
 pub use categories::categories_router;
+pub use drafts::drafts_router;
 pub use posts::posts_router;
 pub use search::search_router;
 pub use threads::threads_router;
+pub use users::users_router;
