@@ -4,7 +4,7 @@ Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI
 
 Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-**Current version:** `0.4.0-dev`
+**Current version:** `0.4.0`
 
 ---
 
