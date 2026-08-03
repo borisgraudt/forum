@@ -1,12 +1,15 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use validator::Validate;
 
-use crate::dto::{CreatePostRequest, ListQuery, PostListResponse, PostResponse};
+use crate::dto::{
+    CreatePostRequest, ListQuery, PostEditListResponse, PostListResponse, PostResponse,
+    UpdatePostRequest, VoteCountResponse,
+};
 use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
+use crate::middleware::{AuthUser, OptionalAuthUser};
 use crate::models::{PostViewJson, UserRole};
 use crate::services::{CategoryService, PostService, ThreadService};
 use crate::state::AppState;
@@ -20,12 +23,21 @@ pub fn posts_router() -> Router<AppState> {
         )
         .route(
             "/categories/{category_slug}/threads/{thread_slug}/posts/{post_id}",
-            delete(delete_post),
+            delete(delete_post).patch(update_post),
+        )
+        .route(
+            "/categories/{category_slug}/threads/{thread_slug}/posts/{post_id}/helpful",
+            post(add_helpful).delete(remove_helpful),
+        )
+        .route(
+            "/categories/{category_slug}/threads/{thread_slug}/posts/{post_id}/edits",
+            get(list_edits),
         )
 }
 
 async fn list_posts(
     State(state): State<AppState>,
+    OptionalAuthUser(viewer): OptionalAuthUser,
     Path((category_slug, thread_slug)): Path<(String, String)>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<(StatusCode, Json<PostListResponse>)> {
@@ -34,14 +46,24 @@ async fn list_posts(
         ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
     let limit = query.limit();
     let offset = query.offset();
-    let total = PostService::count_by_thread(&state.db, thread.id).await?;
-    // OP + replies: allow larger default page for thread view convenience.
-    let posts = PostService::list_by_thread(&state.db, thread.id, limit, offset).await?;
-    let posts = posts.into_iter().map(PostViewJson::from).collect();
+    // Keep soft-deleted placeholders so reply_to chain stays readable for staff? Show all with flag.
+    let total = PostService::count_by_thread(&state.db, thread.id, true).await?;
+    let posts = PostService::list_by_thread(&state.db, thread.id, limit, offset, true).await?;
+
+    let mut out = Vec::with_capacity(posts.len());
+    for p in posts {
+        let voted = if let Some(ref u) = viewer {
+            PostService::viewer_helpful(&state.db, p.id, u.id).await?
+        } else {
+            false
+        };
+        out.push(PostViewJson::from_view(p, voted));
+    }
+
     Ok((
         StatusCode::OK,
         Json(PostListResponse {
-            posts,
+            posts: out,
             total,
             limit,
             offset,
@@ -66,9 +88,50 @@ async fn create_post(
         return Err(AppError::BadRequest("body is required".into()));
     }
 
-    let post = PostService::create_reply(&state.db, thread.id, user.id, &body_text).await?;
+    let post = PostService::create_reply(
+        &state.db,
+        thread.id,
+        user.id,
+        &body_text,
+        body.reply_to_post_id,
+    )
+    .await?;
     Ok((
         StatusCode::CREATED,
+        Json(PostResponse {
+            post: PostViewJson::from(post),
+        }),
+    ))
+}
+
+async fn update_post(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path((category_slug, thread_slug, post_id)): Path<(String, String, i64)>,
+    Json(body): Json<UpdatePostRequest>,
+) -> AppResult<(StatusCode, Json<PostResponse>)> {
+    body.validate().map_err(validation_error)?;
+    let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    let post = PostService::get_view(&state.db, post_id).await?;
+    if post.thread_id != thread.id {
+        return Err(AppError::NotFound);
+    }
+
+    let is_staff = user.role_enum().map(|r| r.is_staff()).unwrap_or(false);
+    if post.author_id != user.id && !is_staff {
+        return Err(AppError::Forbidden);
+    }
+
+    let body_text = body.body.trim().to_string();
+    if body_text.is_empty() {
+        return Err(AppError::BadRequest("body is required".into()));
+    }
+
+    let post = PostService::update_body(&state.db, post_id, user.id, &body_text).await?;
+    Ok((
+        StatusCode::OK,
         Json(PostResponse {
             post: PostViewJson::from(post),
         }),
@@ -97,7 +160,70 @@ async fn delete_post(
         return Err(AppError::Forbidden);
     }
 
-    // Don't allow deleting the only remaining OP if it's the sole post? Allow for mods.
-    PostService::delete(&state.db, post_id).await?;
+    PostService::soft_delete(&state.db, post_id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_edits(
+    State(state): State<AppState>,
+    Path((category_slug, thread_slug, post_id)): Path<(String, String, i64)>,
+) -> AppResult<(StatusCode, Json<PostEditListResponse>)> {
+    let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    let post = PostService::get_view(&state.db, post_id).await?;
+    if post.thread_id != thread.id {
+        return Err(AppError::NotFound);
+    }
+    let edits = PostService::list_edits(&state.db, post_id).await?;
+    Ok((StatusCode::OK, Json(PostEditListResponse { edits })))
+}
+
+async fn add_helpful(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path((category_slug, thread_slug, post_id)): Path<(String, String, i64)>,
+) -> AppResult<(StatusCode, Json<VoteCountResponse>)> {
+    let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    let post = PostService::get_view(&state.db, post_id).await?;
+    if post.thread_id != thread.id {
+        return Err(AppError::NotFound);
+    }
+    if post.author_id == user.id {
+        return Err(AppError::BadRequest(
+            "cannot mark your own post as helpful".into(),
+        ));
+    }
+    let count = PostService::add_helpful(&state.db, post_id, user.id).await?;
+    Ok((
+        StatusCode::OK,
+        Json(VoteCountResponse {
+            count,
+            viewer_voted: true,
+        }),
+    ))
+}
+
+async fn remove_helpful(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path((category_slug, thread_slug, post_id)): Path<(String, String, i64)>,
+) -> AppResult<(StatusCode, Json<VoteCountResponse>)> {
+    let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
+    let thread =
+        ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    let post = PostService::get_view(&state.db, post_id).await?;
+    if post.thread_id != thread.id {
+        return Err(AppError::NotFound);
+    }
+    let count = PostService::remove_helpful(&state.db, post_id, user.id).await?;
+    Ok((
+        StatusCode::OK,
+        Json(VoteCountResponse {
+            count,
+            viewer_voted: false,
+        }),
+    ))
 }

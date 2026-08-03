@@ -1,0 +1,299 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CsrfInput from '../../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  formatWhen,
+  getCookieHeader,
+  getMe,
+  isAdmin,
+  listAdminCategories,
+  listAdminUsers,
+  listRootCategories,
+} from '../../lib/api';
+import type { Category, UserPublic } from '../../lib/types';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+if (!user) {
+  return Astro.redirect('/login');
+}
+if (!isAdmin(user)) {
+  return new Response(null, { status: 403, statusText: 'Forbidden' });
+}
+
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
+
+const page = Math.max(1, Number(Astro.url.searchParams.get('page') || '1') || 1);
+const limit = 30;
+const offset = (page - 1) * limit;
+
+let users: UserPublic[] = [];
+let total = 0;
+let categories: Category[] = [];
+let roots: Category[] = [];
+let loadError: string | null = null;
+
+try {
+  const [userData, cats, rootCats] = await Promise.all([
+    listAdminUsers(cookie, { limit, offset }),
+    listAdminCategories(cookie),
+    listRootCategories(cookie),
+  ]);
+  users = userData.users;
+  total = userData.total;
+  categories = cats;
+  roots = rootCats;
+} catch (e) {
+  loadError = e instanceof Error ? e.message : 'Could not load admin data';
+}
+
+const error = Astro.url.searchParams.get('error');
+const totalPages = Math.max(1, Math.ceil(total / limit));
+
+const parentName = (c: Category) => {
+  if (c.parent_id == null) return null;
+  return categories.find((p) => p.id === c.parent_id)?.name ?? 'Parent';
+};
+---
+
+<BaseLayout title="Admin" user={user} active={null}>
+  <div class="admin-page">
+    <header class="admin-page__head">
+      <h1>Admin</h1>
+      <p>
+        Full site control: members, roles, and the community tree. Only admins can create or change
+        categories.
+      </p>
+      <nav class="admin-tabs" aria-label="Admin sections">
+        <a href="#users">Users</a>
+        <a href="#categories">Categories</a>
+      </nav>
+    </header>
+
+    {error && <div class="alert">{error}</div>}
+    {loadError && <div class="alert">{loadError}</div>}
+
+    <section class="admin-section" id="users" aria-labelledby="users-heading">
+      <div class="admin-section__bar">
+        <h2 id="users-heading">Users</h2>
+        <span class="admin-section__meta">{total} total</span>
+      </div>
+
+      {
+        users.length === 0 && !loadError ? (
+          <p class="ad-empty">No users yet.</p>
+        ) : (
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr>
+                    <td>
+                      <a href={`/u/${encodeURIComponent(u.username)}`}>
+                        {u.display_name || u.username}
+                      </a>
+                      <div class="admin-table__sub">@{u.username}</div>
+                    </td>
+                    <td>
+                      <form method="POST" action="/api/admin/users" class="admin-inline-form">
+                        <CsrfInput token={csrf.token} />
+                        <input type="hidden" name="user_id" value={String(u.id)} />
+                        <select
+                          name="role"
+                          class="admin-select"
+                          onchange="this.form.requestSubmit()"
+                          disabled={u.id === user.id}
+                        >
+                          <option value="user" selected={u.role === 'user'}>
+                            user
+                          </option>
+                          <option value="moderator" selected={u.role === 'moderator'}>
+                            moderator
+                          </option>
+                          <option value="admin" selected={u.role === 'admin'}>
+                            admin
+                          </option>
+                        </select>
+                      </form>
+                    </td>
+                    <td>
+                      <span class:list={['admin-status', { 'admin-status--off': !u.is_active }]}>
+                        {u.is_active ? 'Active' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td class="admin-table__muted">{formatWhen(u.created_at)}</td>
+                    <td>
+                      {u.id !== user.id && (
+                        <form method="POST" action="/api/admin/users" class="inline-form">
+                          <CsrfInput token={csrf.token} />
+                          <input type="hidden" name="user_id" value={String(u.id)} />
+                          <input type="hidden" name="is_active" value={u.is_active ? '0' : '1'} />
+                          <button type="submit" class="btn btn-secondary btn-sm">
+                            {u.is_active ? 'Disable' : 'Enable'}
+                          </button>
+                        </form>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+
+      {
+        totalPages > 1 && (
+          <nav class="pager" aria-label="Users pages">
+            {page > 1 && (
+              <a class="pager__link" href={`/admin?page=${page - 1}#users`}>
+                Previous
+              </a>
+            )}
+            <span class="pager__meta">
+              Page {page} of {totalPages}
+            </span>
+            {page < totalPages && (
+              <a class="pager__link" href={`/admin?page=${page + 1}#users`}>
+                Next
+              </a>
+            )}
+          </nav>
+        )
+      }
+    </section>
+
+    <section class="admin-section" id="categories" aria-labelledby="cats-heading">
+      <div class="admin-section__bar">
+        <h2 id="cats-heading">Categories</h2>
+        <div class="admin-section__actions">
+          <a class="btn btn-primary btn-sm" href="/categories/new">New community</a>
+          {
+            roots[0] && (
+              <a class="btn btn-secondary btn-sm" href={`/categories/new?parent=${roots[0].slug}`}>
+                New subcategory
+              </a>
+            )
+          }
+        </div>
+      </div>
+
+      <p class="admin-section__help">
+        Create top-level communities or subcategories. Empty categories can be deleted; ones with
+        threads must be cleared first.
+      </p>
+
+      {
+        categories.length === 0 && !loadError ? (
+          <p class="ad-empty">
+            No categories yet. <a href="/categories/new">Create the first community</a>.
+          </p>
+        ) : (
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Slug</th>
+                  <th>Parent</th>
+                  <th>Topics</th>
+                  <th>Sort</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((c) => (
+                  <tr class:list={[{ 'admin-table__row--child': c.parent_id != null }]}>
+                    <td>
+                      <form method="POST" action="/api/admin/categories" class="admin-cat-form">
+                        <CsrfInput token={csrf.token} />
+                        <input type="hidden" name="category_id" value={String(c.id)} />
+                        <input type="hidden" name="action" value="update" />
+                        <input
+                          type="text"
+                          name="name"
+                          class="admin-input"
+                          value={c.name}
+                          maxlength="80"
+                          required
+                        />
+                        <input
+                          type="text"
+                          name="description"
+                          class="admin-input admin-input--desc"
+                          value={c.description || ''}
+                          maxlength="500"
+                          placeholder="Description"
+                        />
+                        <div class="admin-cat-form__row">
+                          <label class="admin-sort-label">
+                            Sort
+                            <input
+                              type="number"
+                              name="sort_order"
+                              class="admin-input admin-input--sort"
+                              value={String(c.sort_order)}
+                            />
+                          </label>
+                          <button type="submit" class="btn btn-secondary btn-sm">
+                            Save
+                          </button>
+                        </div>
+                      </form>
+                    </td>
+                    <td>
+                      <a href={`/categories/${c.slug}`}>{c.slug}</a>
+                    </td>
+                    <td class="admin-table__muted">{c.parent_id == null ? '—' : parentName(c)}</td>
+                    <td>{c.topic_count ?? 0}</td>
+                    <td class="admin-table__muted">{c.sort_order}</td>
+                    <td>
+                      <form method="POST" action="/api/admin/categories" class="inline-form">
+                        <CsrfInput token={csrf.token} />
+                        <input type="hidden" name="category_id" value={String(c.id)} />
+                        <input type="hidden" name="action" value="delete" />
+                        <button
+                          type="submit"
+                          class="btn btn-secondary btn-sm"
+                          disabled={(c.topic_count ?? 0) > 0}
+                          title={
+                            (c.topic_count ?? 0) > 0
+                              ? 'Has threads — clear them first'
+                              : 'Delete empty category'
+                          }
+                        >
+                          Delete
+                        </button>
+                      </form>
+                      {c.parent_id == null && (
+                        <a
+                          class="btn btn-secondary btn-sm"
+                          href={`/categories/new?parent=${c.slug}`}
+                          style="margin-left:6px"
+                        >
+                          + Sub
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </section>
+  </div>
+</BaseLayout>

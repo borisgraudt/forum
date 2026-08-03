@@ -20,6 +20,14 @@ impl UserRole {
             Self::Admin => "admin",
         }
     }
+
+    pub fn is_staff(self) -> bool {
+        matches!(self, Self::Moderator | Self::Admin)
+    }
+
+    pub fn is_admin(self) -> bool {
+        matches!(self, Self::Admin)
+    }
 }
 
 impl fmt::Display for UserRole {
@@ -50,6 +58,7 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password_hash: String,
     pub display_name: Option<String>,
+    pub bio: Option<String>,
     pub role: String,
     pub is_active: bool,
     pub created_at: String,
@@ -57,7 +66,6 @@ pub struct User {
 }
 
 impl User {
-    #[allow(dead_code)] // used by admin/moderation paths next
     pub fn role_enum(&self) -> Result<UserRole, String> {
         UserRole::from_str(&self.role)
     }
@@ -67,6 +75,7 @@ impl User {
             id: self.id,
             username: self.username,
             display_name: self.display_name,
+            bio: self.bio,
             role: self.role,
             is_active: self.is_active,
             created_at: self.created_at,
@@ -81,10 +90,48 @@ pub struct UserPublic {
     pub id: i64,
     pub username: String,
     pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bio: Option<String>,
     pub role: String,
     pub is_active: bool,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// Recent topic authored by the user (for profile activity).
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct ProfileThreadItem {
+    pub id: i64,
+    pub title: String,
+    pub slug: String,
+    pub category_slug: String,
+    pub category_name: String,
+    pub created_at: String,
+    pub post_count: i64,
+}
+
+/// Recent non-OP post by the user.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct ProfilePostItem {
+    pub id: i64,
+    pub thread_id: i64,
+    pub thread_title: String,
+    pub thread_slug: String,
+    pub category_slug: String,
+    pub body_preview: String,
+    pub created_at: String,
+}
+
+/// Public profile with light activity stats.
+#[derive(Debug, Clone, Serialize)]
+pub struct UserProfile {
+    pub user: UserPublic,
+    pub post_count: i64,
+    pub thread_count: i64,
+    pub helpful_received: i64,
+    pub reputation: i64,
+    pub recent_threads: Vec<ProfileThreadItem>,
+    pub recent_posts: Vec<ProfilePostItem>,
 }
 
 #[cfg(test)]
@@ -106,6 +153,7 @@ mod tests {
             email: "alice@example.com".into(),
             password_hash: "secret-hash".into(),
             display_name: None,
+            bio: None,
             role: "user".into(),
             is_active: true,
             created_at: "2026-01-01T00:00:00.000Z".into(),

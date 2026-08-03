@@ -2,10 +2,51 @@ export type UserPublic = {
   id: number;
   username: string;
   display_name: string | null;
+  bio?: string | null;
   role: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type ProfileThreadItem = {
+  id: number;
+  title: string;
+  slug: string;
+  category_slug: string;
+  category_name: string;
+  created_at: string;
+  post_count: number;
+};
+
+export type ProfilePostItem = {
+  id: number;
+  thread_id: number;
+  thread_title: string;
+  thread_slug: string;
+  category_slug: string;
+  body_preview: string;
+  created_at: string;
+};
+
+export type UserProfile = {
+  user: UserPublic;
+  post_count: number;
+  thread_count: number;
+  helpful_received: number;
+  reputation: number;
+  recent_threads?: ProfileThreadItem[];
+  recent_posts?: ProfilePostItem[];
+};
+
+export type PostEdit = {
+  id: number;
+  post_id: number;
+  editor_id: number;
+  body_before: string;
+  created_at: string;
+  editor_username: string;
+  editor_display_name: string | null;
 };
 
 export type Category = {
@@ -30,6 +71,7 @@ export type Thread = {
   is_locked: boolean;
   post_count: number;
   view_count: number;
+  me_too_count?: number;
   last_post_at: string | null;
   created_at: string;
   updated_at: string;
@@ -43,10 +85,26 @@ export type Post = {
   author_id: number;
   body: string;
   body_html?: string;
+  reply_to_post_id?: number | null;
+  is_deleted?: boolean;
+  edited_at?: string | null;
   created_at: string;
   updated_at: string;
   author_username: string;
   author_display_name: string | null;
+  helpful_count?: number;
+  viewer_marked_helpful?: boolean;
+};
+
+export type Draft = {
+  id: number;
+  user_id: number;
+  kind: string;
+  category_slug: string | null;
+  thread_id: number | null;
+  title: string | null;
+  body: string;
+  updated_at: string;
 };
 
 export type PageMeta = {

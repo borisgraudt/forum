@@ -31,6 +31,19 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
   const data = await res.json();
   const threadSlug = data.thread?.slug;
+
+  // Clear matching draft after successful publish.
+  const draftId = String(form.get('draft_id') || '').trim();
+  if (draftId) {
+    await fetch(`${API_BASE}/drafts/${encodeURIComponent(draftId)}`, {
+      method: 'DELETE',
+      headers: {
+        ...(headers.Cookie ? { Cookie: headers.Cookie } : {}),
+        ...(headers['X-CSRF-Token'] ? { 'X-CSRF-Token': headers['X-CSRF-Token'] } : {}),
+      },
+    }).catch(() => null);
+  }
+
   return redirect(
     threadSlug ? `/categories/${category}/threads/${threadSlug}` : `/categories/${category}`,
     303,

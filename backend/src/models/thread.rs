@@ -33,4 +33,5 @@ pub struct ThreadView {
     pub updated_at: String,
     pub author_username: String,
     pub author_display_name: Option<String>,
+    pub me_too_count: i64,
 }

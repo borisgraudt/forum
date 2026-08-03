@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::models::{Category, PostViewJson, ThreadView};
+use crate::models::{Category, Draft, PostEdit, PostViewJson, ThreadView, UserProfile, UserPublic};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateCategoryRequest {
@@ -36,12 +36,57 @@ pub struct CreateThreadRequest {
 pub struct CreatePostRequest {
     #[validate(length(min = 1, max = 50_000, message = "body must be 1-50000 characters"))]
     pub body: String,
+    pub reply_to_post_id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdatePostRequest {
+    #[validate(length(min = 1, max = 50_000, message = "body must be 1-50000 characters"))]
+    pub body: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateThreadRequest {
     pub is_locked: Option<bool>,
     pub is_pinned: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateProfileRequest {
+    #[validate(length(max = 64, message = "display_name is too long"))]
+    pub display_name: Option<String>,
+    /// Pass empty string to clear.
+    #[validate(length(max = 500, message = "bio is too long"))]
+    pub bio: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct AdminUpdateUserRequest {
+    pub role: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct AdminUpdateCategoryRequest {
+    #[validate(length(min = 1, max = 80, message = "name must be 1-80 characters"))]
+    pub name: Option<String>,
+    #[validate(length(max = 500, message = "description is too long"))]
+    pub description: Option<String>,
+    pub sort_order: Option<i64>,
+    /// When true, clear description.
+    pub clear_description: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpsertDraftRequest {
+    #[validate(length(min = 1, max = 16))]
+    pub kind: String,
+    pub category_slug: Option<String>,
+    pub thread_id: Option<i64>,
+    #[validate(length(max = 200))]
+    pub title: Option<String>,
+    #[validate(length(max = 50_000))]
+    pub body: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,7 +128,6 @@ pub struct CategoryResponse {
     pub category: Category,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<Category>>,
-    /// Parent community when this category is a subcategory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<Category>,
 }
@@ -96,6 +140,7 @@ pub struct CategoryListResponse {
 #[derive(Debug, Serialize)]
 pub struct ThreadResponse {
     pub thread: ThreadView,
+    pub viewer_me_too: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_post: Option<PostViewJson>,
 }
@@ -122,6 +167,12 @@ pub struct PostListResponse {
 }
 
 #[derive(Debug, Serialize)]
+pub struct VoteCountResponse {
+    pub count: i64,
+    pub viewer_voted: bool,
+}
+
+#[derive(Debug, Serialize)]
 pub struct SearchHit {
     pub thread: ThreadView,
     pub category_slug: String,
@@ -142,4 +193,32 @@ pub struct SearchResponse {
 #[derive(Debug, Serialize)]
 pub struct CsrfResponse {
     pub csrf_token: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserListResponse {
+    pub users: Vec<UserPublic>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProfileResponse {
+    pub profile: UserProfile,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DraftListResponse {
+    pub drafts: Vec<Draft>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DraftResponse {
+    pub draft: Draft,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PostEditListResponse {
+    pub edits: Vec<PostEdit>,
 }

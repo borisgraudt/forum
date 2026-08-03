@@ -12,10 +12,12 @@ import {
   getMe,
   initials,
   isModerator,
+  listDrafts,
+  listPostEdits,
   listPosts,
   getThread,
 } from '../../../../lib/api';
-import type { Category, Post, Thread } from '../../../../lib/types';
+import type { Category, Draft, Post, PostEdit, Thread } from '../../../../lib/types';
 
 const { slug, threadSlug } = Astro.params;
 if (!slug || !threadSlug) return Astro.redirect('/');
@@ -27,8 +29,20 @@ let category: Category | undefined;
 let parent: Category | null = null;
 let thread: Thread | undefined;
 let posts: Post[] = [];
+let viewerMeToo = false;
 let error: string | null = null;
 let csrfToken = '';
+let replyDraft: Draft | null = null;
+let historyEdits: PostEdit[] = [];
+
+const formError = Astro.url.searchParams.get('error');
+const draftSaved = Astro.url.searchParams.get('draft') === 'saved';
+const replyToParam = Astro.url.searchParams.get('reply_to');
+const editParam = Astro.url.searchParams.get('edit');
+const historyParam = Astro.url.searchParams.get('history');
+const replyToId = replyToParam ? Number(replyToParam) : NaN;
+const editId = editParam ? Number(editParam) : NaN;
+const historyId = historyParam ? Number(historyParam) : NaN;
 
 try {
   const csrfP = ensureCsrf(cookie);
@@ -43,9 +57,27 @@ try {
   category = cat.category;
   parent = cat.parent ?? null;
   thread = t.thread;
+  viewerMeToo = Boolean(t.viewer_me_too);
   posts = postList.posts;
   csrfToken = csrf.token;
   applySetCookies(Astro.response, csrf.setCookies);
+
+  if (user && thread) {
+    try {
+      const drafts = await listDrafts(cookie);
+      replyDraft = drafts.find((d) => d.kind === 'reply' && d.thread_id === thread!.id) || null;
+    } catch {
+      replyDraft = null;
+    }
+  }
+
+  if (Number.isFinite(historyId) && historyId > 0 && category && thread) {
+    try {
+      historyEdits = await listPostEdits(category.slug, thread.slug, historyId, cookie);
+    } catch {
+      historyEdits = [];
+    }
+  }
 } catch (e) {
   if (e instanceof ApiRequestError && e.status === 404) {
     return new Response(null, { status: 404, statusText: 'Not Found' });
@@ -61,18 +93,66 @@ try {
   }
 }
 
-const formError = Astro.url.searchParams.get('error');
 const op = posts[0];
-const replies = posts.slice(1);
-const topReply = replies[0];
-const restReplies = replies.slice(1);
+// Soft-deleted posts stay as placeholders so reply chains remain readable.
+const visibleReplies = posts.slice(1);
+
+// Top-ranking reply: highest helpful among non-deleted, then oldest.
+const ranked = [...visibleReplies]
+  .filter((p) => !p.is_deleted)
+  .sort((a, b) => {
+    const ha = a.helpful_count ?? 0;
+    const hb = b.helpful_count ?? 0;
+    if (hb !== ha) return hb - ha;
+    return a.id - b.id;
+  });
+const topReply = ranked[0] && (ranked[0].helpful_count ?? 0) > 0 ? ranked[0] : (ranked[0] ?? null);
+const restReplies = topReply ? visibleReplies.filter((p) => p.id !== topReply.id) : visibleReplies;
+
 const opAuthor = op ? authorLabel(op) : '';
-const replyHref = user ? '#reply' : '/login';
 const canMod = isModerator(user);
 const views = thread?.view_count ?? 0;
+const meTooCount = thread?.me_too_count ?? 0;
+const canMeToo = Boolean(user && thread && user.id !== thread.author_id);
+const replyToPost =
+  Number.isFinite(replyToId) && replyToId > 0 ? posts.find((p) => p.id === replyToId) : undefined;
 
 function bodyHtml(post: Post) {
   return post.body_html || post.body;
+}
+
+function replyHref(postId?: number) {
+  if (!user || !category || !thread) return '/login';
+  if (postId) {
+    return `/categories/${category.slug}/threads/${thread.slug}?reply_to=${postId}#reply`;
+  }
+  return `#reply`;
+}
+
+function editHref(postId: number) {
+  if (!category || !thread) return '#';
+  return `/categories/${category.slug}/threads/${thread.slug}?edit=${postId}#post-${postId}`;
+}
+
+function historyHref(postId: number) {
+  if (!category || !thread) return '#';
+  return `/categories/${category.slug}/threads/${thread.slug}?history=${postId}#post-${postId}`;
+}
+
+function authorHref(username: string) {
+  return `/u/${encodeURIComponent(username)}`;
+}
+
+function canEditPost(post: Post) {
+  return Boolean(user && (user.id === post.author_id || canMod) && !post.is_deleted);
+}
+
+function canDeletePost(post: Post) {
+  return Boolean(user && (user.id === post.author_id || canMod) && !post.is_deleted);
+}
+
+function canHelpful(post: Post) {
+  return Boolean(user && user.id !== post.author_id && !post.is_deleted);
 }
 ---
 
@@ -131,60 +211,142 @@ function bodyHtml(post: Post) {
 
         {formError && <div class="alert">{formError}</div>}
 
-        <article class="ad-post ad-post--op">
+        <article class="ad-post ad-post--op" id={`post-${op.id}`}>
           <header class="ad-post__head">
-            <div class="ad-post__avatar" aria-hidden="true">
+            <a class="ad-post__avatar" href={authorHref(op.author_username)} aria-hidden="true">
               {initials(opAuthor)}
-            </div>
+            </a>
             <div class="ad-post__who">
               <div class="ad-post__name-row">
-                <span class="ad-post__name">{opAuthor}</span>
+                <a class="ad-post__name" href={authorHref(op.author_username)}>
+                  {opAuthor}
+                </a>
                 <span class="ad-post__role">Author</span>
               </div>
             </div>
           </header>
 
           <h1 class="ad-post__title">{thread.title}</h1>
-          <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
-          <p class="ad-post__posted">Posted on {formatWhen(op.created_at)}</p>
-
-          <div class="ad-post__footer">
-            <div class="ad-post__actions" role="group" aria-label="Question actions">
-              <div class="ad-pill-group">
-                <button type="button" class="ad-pill" disabled title="Coming soon">
-                  <span class="ad-pill__icon" aria-hidden="true">
-                    ↑
-                  </span>
-                  Helpful
-                </button>
-                <button type="button" class="ad-pill" disabled title="Coming soon">
-                  <span class="ad-pill__icon" aria-hidden="true">
-                    ↓
-                  </span>
-                  Not helpful
-                </button>
-              </div>
-              <button type="button" class="ad-pill" disabled title="Coming soon">
-                Me too
-              </button>
-              {!thread.is_locked && (
-                <a class="ad-pill ad-pill--solid" href={replyHref}>
-                  Reply
-                </a>
-              )}
+          {op.is_deleted ? (
+            <p class="ad-post__deleted">This post was deleted.</p>
+          ) : (
+            <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
+          )}
+          <p class="ad-post__posted">
+            Posted on {formatWhen(op.created_at)}
+            {op.edited_at && (
+              <span class="ad-post__edited">
+                {' '}
+                · edited {formatWhen(op.edited_at)}
+                {' · '}
+                <a href={historyHref(op.id)}>History</a>
+              </span>
+            )}
+          </p>
+          {historyId === op.id && historyEdits.length > 0 && (
+            <div class="ad-history">
+              <h3 class="ad-history__title">Edit history</h3>
+              <ul class="ad-history__list">
+                {historyEdits.map((ed) => (
+                  <li>
+                    <div class="ad-history__meta">
+                      {ed.editor_display_name || ed.editor_username} · {formatWhen(ed.created_at)}
+                    </div>
+                    <pre class="ad-history__body">{ed.body_before}</pre>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          )}
+
+          {editId === op.id && canEditPost(op) ? (
+            <form
+              method="POST"
+              action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${op.id}/edit`}
+              class="ad-edit-form"
+            >
+              <CsrfInput token={csrfToken} />
+              <textarea name="body" required maxlength="50000" rows="8">
+                {op.body}
+              </textarea>
+              <div class="ad-edit-form__actions">
+                <button class="btn btn-primary btn-sm" type="submit">
+                  Save
+                </button>
+                <a
+                  class="btn btn-secondary btn-sm"
+                  href={`/categories/${category.slug}/threads/${thread.slug}`}
+                >
+                  Cancel
+                </a>
+              </div>
+            </form>
+          ) : (
+            <div class="ad-post__footer">
+              <div class="ad-post__actions" role="group" aria-label="Question actions">
+                {user ? (
+                  canMeToo ? (
+                    <form
+                      method="POST"
+                      action={`/api/categories/${category.slug}/threads/${thread.slug}/me-too`}
+                      class="inline-form"
+                    >
+                      <CsrfInput token={csrfToken} />
+                      <input type="hidden" name="action" value={viewerMeToo ? 'remove' : 'add'} />
+                      <button
+                        type="submit"
+                        class:list={['ad-pill', { 'ad-pill--active': viewerMeToo }]}
+                      >
+                        Me too{meTooCount > 0 ? ` · ${meTooCount}` : ''}
+                      </button>
+                    </form>
+                  ) : (
+                    <span class="ad-pill ad-pill--static" title="You asked this">
+                      Me too{meTooCount > 0 ? ` · ${meTooCount}` : ''}
+                    </span>
+                  )
+                ) : (
+                  <a class="ad-pill" href="/login">
+                    Me too{meTooCount > 0 ? ` · ${meTooCount}` : ''}
+                  </a>
+                )}
+                {!thread.is_locked && (
+                  <a class="ad-pill ad-pill--solid" href={replyHref()}>
+                    Reply
+                  </a>
+                )}
+                {canEditPost(op) && (
+                  <a class="ad-pill" href={editHref(op.id)}>
+                    Edit
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </article>
 
         {topReply && (
-          <article class="ad-post ad-post--featured">
+          <article
+            class:list={[
+              'ad-post',
+              'ad-post--featured',
+              { 'ad-post--deleted': topReply.is_deleted },
+            ]}
+            id={`post-${topReply.id}`}
+          >
             <header class="ad-post__head">
-              <div class="ad-post__avatar" aria-hidden="true">
+              <a
+                class="ad-post__avatar"
+                href={authorHref(topReply.author_username)}
+                aria-hidden="true"
+              >
                 {initials(authorLabel(topReply))}
-              </div>
+              </a>
               <div class="ad-post__who">
                 <div class="ad-post__name-row">
-                  <span class="ad-post__name">{authorLabel(topReply)}</span>
+                  <a class="ad-post__name" href={authorHref(topReply.author_username)}>
+                    {authorLabel(topReply)}
+                  </a>
                 </div>
               </div>
               <span class="ad-post__badge">Top-ranking reply</span>
@@ -192,60 +354,150 @@ function bodyHtml(post: Post) {
 
             <p class="ad-post__posted ad-post__posted--inline">
               Posted on {formatWhen(topReply.created_at)}
+              {topReply.edited_at && (
+                <span class="ad-post__edited">
+                  {' '}
+                  · edited {formatWhen(topReply.edited_at)}
+                  {' · '}
+                  <a href={historyHref(topReply.id)}>History</a>
+                </span>
+              )}
             </p>
-            <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
-
-            <div class="ad-post__footer">
-              <div class="ad-post__actions" role="group" aria-label="Reply actions">
-                <div class="ad-pill-group">
-                  <button type="button" class="ad-pill" disabled title="Coming soon">
-                    <span class="ad-pill__icon" aria-hidden="true">
-                      ↑
-                    </span>
-                    Helpful
-                  </button>
-                  <button type="button" class="ad-pill" disabled title="Coming soon">
-                    <span class="ad-pill__icon" aria-hidden="true">
-                      ↓
-                    </span>
-                    Not helpful
-                  </button>
-                </div>
-                {!thread.is_locked && (
-                  <a class="ad-pill" href={replyHref}>
-                    Reply
-                  </a>
-                )}
-                {(canMod || (user && user.id === topReply.author_id)) && (
-                  <form
-                    method="POST"
-                    action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${topReply.id}`}
-                    class="inline-form"
-                  >
-                    <CsrfInput token={csrfToken} />
-                    <button type="submit" class="ad-pill ad-pill--danger">
-                      Delete
-                    </button>
-                  </form>
-                )}
+            {historyId === topReply.id && historyEdits.length > 0 && (
+              <div class="ad-history">
+                <h3 class="ad-history__title">Edit history</h3>
+                <ul class="ad-history__list">
+                  {historyEdits.map((ed) => (
+                    <li>
+                      <div class="ad-history__meta">
+                        {ed.editor_display_name || ed.editor_username} · {formatWhen(ed.created_at)}
+                      </div>
+                      <pre class="ad-history__body">{ed.body_before}</pre>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
+            )}
+
+            {editId === topReply.id && canEditPost(topReply) ? (
+              <form
+                method="POST"
+                action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${topReply.id}/edit`}
+                class="ad-edit-form"
+              >
+                <CsrfInput token={csrfToken} />
+                <textarea name="body" required maxlength="50000" rows="8">
+                  {topReply.body}
+                </textarea>
+                <div class="ad-edit-form__actions">
+                  <button class="btn btn-primary btn-sm" type="submit">
+                    Save
+                  </button>
+                  <a
+                    class="btn btn-secondary btn-sm"
+                    href={`/categories/${category.slug}/threads/${thread.slug}`}
+                  >
+                    Cancel
+                  </a>
+                </div>
+              </form>
+            ) : topReply.is_deleted ? (
+              <p class="ad-post__deleted">This reply was deleted.</p>
+            ) : (
+              <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
+            )}
+
+            {!topReply.is_deleted && editId !== topReply.id && (
+              <div class="ad-post__footer">
+                <div class="ad-post__actions" role="group" aria-label="Reply actions">
+                  {canHelpful(topReply) ? (
+                    <form
+                      method="POST"
+                      action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${topReply.id}/helpful`}
+                      class="inline-form"
+                    >
+                      <CsrfInput token={csrfToken} />
+                      <input
+                        type="hidden"
+                        name="action"
+                        value={topReply.viewer_marked_helpful ? 'remove' : 'add'}
+                      />
+                      <button
+                        type="submit"
+                        class:list={[
+                          'ad-pill',
+                          { 'ad-pill--active': topReply.viewer_marked_helpful },
+                        ]}
+                      >
+                        <span class="ad-pill__icon" aria-hidden="true">
+                          ↑
+                        </span>
+                        Helpful
+                        {(topReply.helpful_count ?? 0) > 0 ? ` · ${topReply.helpful_count}` : ''}
+                      </button>
+                    </form>
+                  ) : (
+                    <span class="ad-pill ad-pill--static">
+                      <span class="ad-pill__icon" aria-hidden="true">
+                        ↑
+                      </span>
+                      Helpful
+                      {(topReply.helpful_count ?? 0) > 0 ? ` · ${topReply.helpful_count}` : ''}
+                    </span>
+                  )}
+                  {!thread.is_locked && (
+                    <a class="ad-pill" href={replyHref(topReply.id)}>
+                      Reply
+                    </a>
+                  )}
+                  {canEditPost(topReply) && (
+                    <a class="ad-pill" href={editHref(topReply.id)}>
+                      Edit
+                    </a>
+                  )}
+                  {canDeletePost(topReply) && (
+                    <form
+                      method="POST"
+                      action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${topReply.id}`}
+                      class="inline-form"
+                    >
+                      <CsrfInput token={csrfToken} />
+                      <button type="submit" class="ad-pill ad-pill--danger">
+                        Delete
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            )}
           </article>
         )}
 
         <section class="ad-replies" aria-label="Replies">
           {restReplies.map((post) => {
             const who = authorLabel(post);
-            const canDelete = canMod || (user && user.id === post.author_id);
+            const replyTarget = post.reply_to_post_id
+              ? posts.find((p) => p.id === post.reply_to_post_id)
+              : null;
+            const replyLabel = replyTarget ? authorLabel(replyTarget) : opAuthor;
             return (
-              <article class="ad-post">
+              <article
+                class:list={['ad-post', { 'ad-post--deleted': post.is_deleted }]}
+                id={`post-${post.id}`}
+              >
                 <header class="ad-post__head">
-                  <div class="ad-post__avatar" aria-hidden="true">
+                  <a
+                    class="ad-post__avatar"
+                    href={authorHref(post.author_username)}
+                    aria-hidden="true"
+                  >
                     {initials(who)}
-                  </div>
+                  </a>
                   <div class="ad-post__who">
                     <div class="ad-post__name-row">
-                      <span class="ad-post__name">{who}</span>
+                      <a class="ad-post__name" href={authorHref(post.author_username)}>
+                        {who}
+                      </a>
                       {post.author_id === op.author_id && <span class="ad-post__role">Author</span>}
                     </div>
                   </div>
@@ -253,62 +505,170 @@ function bodyHtml(post: Post) {
 
                 <p class="ad-post__posted ad-post__posted--inline">
                   {formatWhen(post.created_at)}
-                  {opAuthor && <> in response to {opAuthor}</>}
+                  {post.edited_at && (
+                    <span class="ad-post__edited">
+                      {' '}
+                      · edited {formatWhen(post.edited_at)}
+                      {' · '}
+                      <a href={historyHref(post.id)}>History</a>
+                    </span>
+                  )}
+                  {replyLabel && (
+                    <>
+                      {' '}
+                      in response to{' '}
+                      {replyTarget ? (
+                        <a href={`#post-${replyTarget.id}`}>{replyLabel}</a>
+                      ) : (
+                        replyLabel
+                      )}
+                    </>
+                  )}
                 </p>
-                <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
-
-                <div class="ad-post__footer">
-                  <div class="ad-post__actions" role="group" aria-label="Reply actions">
-                    <div class="ad-pill-group">
-                      <button type="button" class="ad-pill" disabled title="Coming soon">
-                        <span class="ad-pill__icon" aria-hidden="true">
-                          ↑
-                        </span>
-                        Helpful
-                      </button>
-                      <button type="button" class="ad-pill" disabled title="Coming soon">
-                        <span class="ad-pill__icon" aria-hidden="true">
-                          ↓
-                        </span>
-                        Not helpful
-                      </button>
-                    </div>
-                    {!thread.is_locked && (
-                      <a class="ad-pill" href={replyHref}>
-                        Reply
-                      </a>
-                    )}
-                    {canDelete && (
-                      <form
-                        method="POST"
-                        action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${post.id}`}
-                        class="inline-form"
-                      >
-                        <CsrfInput token={csrfToken} />
-                        <button type="submit" class="ad-pill ad-pill--danger">
-                          Delete
-                        </button>
-                      </form>
-                    )}
+                {historyId === post.id && historyEdits.length > 0 && (
+                  <div class="ad-history">
+                    <h3 class="ad-history__title">Edit history</h3>
+                    <ul class="ad-history__list">
+                      {historyEdits.map((ed) => (
+                        <li>
+                          <div class="ad-history__meta">
+                            {ed.editor_display_name || ed.editor_username} ·{' '}
+                            {formatWhen(ed.created_at)}
+                          </div>
+                          <pre class="ad-history__body">{ed.body_before}</pre>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
+                )}
+
+                {editId === post.id && canEditPost(post) ? (
+                  <form
+                    method="POST"
+                    action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${post.id}/edit`}
+                    class="ad-edit-form"
+                  >
+                    <CsrfInput token={csrfToken} />
+                    <textarea name="body" required maxlength="50000" rows="8">
+                      {post.body}
+                    </textarea>
+                    <div class="ad-edit-form__actions">
+                      <button class="btn btn-primary btn-sm" type="submit">
+                        Save
+                      </button>
+                      <a
+                        class="btn btn-secondary btn-sm"
+                        href={`/categories/${category.slug}/threads/${thread.slug}`}
+                      >
+                        Cancel
+                      </a>
+                    </div>
+                  </form>
+                ) : post.is_deleted ? (
+                  <p class="ad-post__deleted">This reply was deleted.</p>
+                ) : (
+                  <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
+                )}
+
+                {!post.is_deleted && editId !== post.id && (
+                  <div class="ad-post__footer">
+                    <div class="ad-post__actions" role="group" aria-label="Reply actions">
+                      {canHelpful(post) ? (
+                        <form
+                          method="POST"
+                          action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${post.id}/helpful`}
+                          class="inline-form"
+                        >
+                          <CsrfInput token={csrfToken} />
+                          <input
+                            type="hidden"
+                            name="action"
+                            value={post.viewer_marked_helpful ? 'remove' : 'add'}
+                          />
+                          <button
+                            type="submit"
+                            class:list={[
+                              'ad-pill',
+                              { 'ad-pill--active': post.viewer_marked_helpful },
+                            ]}
+                          >
+                            <span class="ad-pill__icon" aria-hidden="true">
+                              ↑
+                            </span>
+                            Helpful
+                            {(post.helpful_count ?? 0) > 0 ? ` · ${post.helpful_count}` : ''}
+                          </button>
+                        </form>
+                      ) : (
+                        <span class="ad-pill ad-pill--static">
+                          <span class="ad-pill__icon" aria-hidden="true">
+                            ↑
+                          </span>
+                          Helpful
+                          {(post.helpful_count ?? 0) > 0 ? ` · ${post.helpful_count}` : ''}
+                        </span>
+                      )}
+                      {!thread.is_locked && (
+                        <a class="ad-pill" href={replyHref(post.id)}>
+                          Reply
+                        </a>
+                      )}
+                      {canEditPost(post) && (
+                        <a class="ad-pill" href={editHref(post.id)}>
+                          Edit
+                        </a>
+                      )}
+                      {canDeletePost(post) && (
+                        <form
+                          method="POST"
+                          action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${post.id}`}
+                          class="inline-form"
+                        >
+                          <CsrfInput token={csrfToken} />
+                          <button type="submit" class="ad-pill ad-pill--danger">
+                            Delete
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                )}
               </article>
             );
           })}
         </section>
 
-        {replies.length === 0 && <div class="ad-empty">No replies yet.</div>}
+        {visibleReplies.length === 0 && <div class="ad-empty">No replies yet.</div>}
 
         {thread.is_locked ? (
           <div class="ad-locked">This topic is locked.</div>
         ) : user ? (
           <section class="ad-reply" id="reply">
-            <h2 class="ad-reply__heading">Add a reply</h2>
+            <h2 class="ad-reply__heading">
+              {replyToPost ? `Reply to ${authorLabel(replyToPost)}` : 'Add a reply'}
+            </h2>
+            {draftSaved && <div class="alert alert--ok">Draft saved.</div>}
+            {replyDraft && !draftSaved && (
+              <div class="alert alert--ok">Restored your reply draft.</div>
+            )}
+            {replyToPost && !replyToPost.is_deleted && (
+              <blockquote class="ad-reply__quote">
+                <a href={`#post-${replyToPost.id}`} class="ad-reply__quote-link">
+                  {authorLabel(replyToPost)}
+                </a>
+                <div class="ad-reply__quote-body md-body" set:html={bodyHtml(replyToPost)} />
+              </blockquote>
+            )}
             <form
               method="POST"
               action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
+              id="reply-form"
             >
               <CsrfInput token={csrfToken} />
+              {replyDraft && <input type="hidden" name="draft_id" value={String(replyDraft.id)} />}
+              {replyToPost && (
+                <input type="hidden" name="reply_to_post_id" value={String(replyToPost.id)} />
+              )}
               <div class="ad-reply__box">
                 <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
                   {initials(user.display_name || user.username)}
@@ -320,7 +680,9 @@ function bodyHtml(post: Post) {
                       required
                       maxlength="50000"
                       placeholder="Write a reply… Markdown supported."
-                    />
+                    >
+                      {replyDraft?.body || ''}
+                    </textarea>
                     <div class="ask-toolbar" aria-hidden="true">
                       <span>B</span>
                       <span>I</span>
@@ -331,9 +693,44 @@ function bodyHtml(post: Post) {
                     <button class="btn btn-primary" type="submit">
                       Post reply
                     </button>
+                    <button
+                      class="btn btn-secondary"
+                      type="submit"
+                      formaction="/api/drafts"
+                      formnovalidate
+                    >
+                      Save draft
+                    </button>
+                    {replyDraft && (
+                      <button
+                        class="btn btn-secondary"
+                        type="submit"
+                        formaction="/api/drafts"
+                        name="action"
+                        value="delete"
+                        formnovalidate
+                      >
+                        Discard draft
+                      </button>
+                    )}
+                    {replyToPost && (
+                      <a
+                        class="btn btn-secondary"
+                        href={`/categories/${category.slug}/threads/${thread.slug}#reply`}
+                      >
+                        Clear quote
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
+              <input type="hidden" name="kind" value="reply" />
+              <input type="hidden" name="thread_id" value={String(thread.id)} />
+              <input
+                type="hidden"
+                name="back"
+                value={`/categories/${category.slug}/threads/${thread.slug}#reply`}
+              />
             </form>
           </section>
         ) : (

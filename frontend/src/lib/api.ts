@@ -1,4 +1,15 @@
-import type { ApiError, Category, PageMeta, Post, SearchHit, Thread, UserPublic } from './types';
+import type {
+  ApiError,
+  Category,
+  Draft,
+  PageMeta,
+  Post,
+  PostEdit,
+  SearchHit,
+  Thread,
+  UserProfile,
+  UserPublic,
+} from './types';
 
 // Prefer 127.0.0.1 over localhost: Node's fetch resolves localhost to ::1 first,
 // and the API often only listens on IPv4 — each SSR hop paid ~10ms+ of delay.
@@ -170,7 +181,7 @@ export async function listThreads(
 }
 
 export async function getThread(categorySlug: string, threadSlug: string, cookie?: string | null) {
-  return request<{ thread: Thread; first_post?: Post | null }>(
+  return request<{ thread: Thread; viewer_me_too?: boolean; first_post?: Post | null }>(
     `/categories/${encodeURIComponent(categorySlug)}/threads/${encodeURIComponent(threadSlug)}`,
     { cookie },
   );
@@ -209,7 +220,8 @@ export async function getMe(cookie?: string | null): Promise<UserPublic | null> 
     const data = await request<{ user: UserPublic }>('/auth/me', { cookie });
     return data.user;
   } catch (err) {
-    if (err instanceof ApiRequestError && err.status === 401) return null;
+    // Unauthenticated or transient rate-limit: treat as logged-out for SSR shells.
+    if (err instanceof ApiRequestError && (err.status === 401 || err.status === 429)) return null;
     throw err;
   }
 }
@@ -217,6 +229,53 @@ export async function getMe(cookie?: string | null): Promise<UserPublic | null> 
 export function isModerator(user: UserPublic | null | undefined): boolean {
   if (!user) return false;
   return user.role === 'moderator' || user.role === 'admin';
+}
+
+export function isAdmin(user: UserPublic | null | undefined): boolean {
+  return user?.role === 'admin';
+}
+
+export async function getUserProfile(username: string, cookie?: string | null) {
+  const data = await request<{ profile: UserProfile }>(`/users/${encodeURIComponent(username)}`, {
+    cookie,
+  });
+  return data.profile;
+}
+
+export async function listAdminUsers(
+  cookie?: string | null,
+  page: { limit?: number; offset?: number } = {},
+) {
+  const qs = new URLSearchParams();
+  if (page.limit != null) qs.set('limit', String(page.limit));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  const q = qs.toString();
+  return request<{ users: UserPublic[] } & PageMeta>(`/admin/users${q ? `?${q}` : ''}`, {
+    cookie,
+  });
+}
+
+export async function listAdminCategories(cookie?: string | null) {
+  const data = await request<{ categories: Category[] }>('/admin/categories', { cookie });
+  return data.categories;
+}
+
+export async function listPostEdits(
+  categorySlug: string,
+  threadSlug: string,
+  postId: number,
+  cookie?: string | null,
+) {
+  const data = await request<{ edits: PostEdit[] }>(
+    `/categories/${encodeURIComponent(categorySlug)}/threads/${encodeURIComponent(threadSlug)}/posts/${postId}/edits`,
+    { cookie },
+  );
+  return data.edits;
+}
+
+export async function listDrafts(cookie?: string | null) {
+  const data = await request<{ drafts: Draft[] }>('/drafts', { cookie });
+  return data.drafts;
 }
 
 export function formatWhen(iso: string | null | undefined): string {
