@@ -133,12 +133,18 @@ impl AuthService {
 
     /// Authenticate and return the user, or a generic unauthorized error.
     pub async fn authenticate(db: &SqlitePool, login: &str, password: String) -> AppResult<User> {
+        use crate::services::ModerationService;
+
         let user = Self::find_by_login(db, login)
             .await?
             .ok_or(AppError::Unauthorized)?;
 
         if !user.is_active {
             return Err(AppError::Unauthorized);
+        }
+
+        if ModerationService::is_banned(db, user.id).await? {
+            return Err(AppError::Forbidden);
         }
 
         let ok = Self::verify_password(password, user.password_hash.clone()).await?;

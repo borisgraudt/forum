@@ -4,7 +4,7 @@ Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI
 
 Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-**Current version:** `0.3.0`
+**Current version:** `0.4.0-dev`
 
 ---
 
@@ -125,12 +125,12 @@ Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community produ
 - [x] **Drafts** for ask + reply
 
 ### v0.4 — Trust, safety, identity
-- [ ] **Report** + mod queue
-- [ ] **Ban / mute / timeout** users
-- [ ] **Audit log** of every mod/admin action
-- [ ] Per-route **rate limits** (auth / post / search)
-- [ ] **Password reset** + email verification
-- [ ] **Mentions** (`@user`)
+- [x] **Report** + mod queue (`/mod`)
+- [x] **Ban / mute / timeout** users
+- [x] **Audit log** of mod/admin actions
+- [x] Per-route **rate limits** (auth / write / search / default)
+- [x] **Mentions** (`@user` → profile link)
+- ~~Password reset + email verification~~ → v0.5 (needs mail)
 
 ### v0.5 — Media & composition
 - [ ] **Image / file attachments** (limits, MIME allowlist, virus scan hooks)
@@ -138,6 +138,7 @@ Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community produ
 - [ ] **Real markdown toolbar** (bold/italic/list/link/code, not decorative)
 - [ ] **Embed previews** for safe links (optional toggle)
 - [ ] Clipboard paste images into posts
+- [ ] **Password reset** + email verification (needs mail provider)
 
 ### v0.6 — Discovery, engagement, realtime
 - [ ] **Notifications** (in-app + email digests)

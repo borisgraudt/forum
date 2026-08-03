@@ -70,6 +70,26 @@ async fn update_user(
 
     let user =
         UserService::admin_update(&state.db, user_id, body.role.as_deref(), body.is_active).await?;
+
+    let _ = crate::services::ModerationService::audit(
+        &state.db,
+        Some(admin.id),
+        "admin.user_update",
+        Some("user"),
+        Some(user_id),
+        Some(&format!(
+            r#"{{"role":{},"is_active":{}}}"#,
+            body.role
+                .as_ref()
+                .map(|r| format!("\"{r}\""))
+                .unwrap_or_else(|| "null".into()),
+            body.is_active
+                .map(|b| b.to_string())
+                .unwrap_or_else(|| "null".into())
+        )),
+    )
+    .await;
+
     Ok((StatusCode::OK, Json(user)))
 }
 

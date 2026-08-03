@@ -36,6 +36,7 @@ let replyDraft: Draft | null = null;
 let historyEdits: PostEdit[] = [];
 
 const formError = Astro.url.searchParams.get('error');
+const reported = Astro.url.searchParams.get('reported') === '1';
 const draftSaved = Astro.url.searchParams.get('draft') === 'saved';
 const replyToParam = Astro.url.searchParams.get('reply_to');
 const editParam = Astro.url.searchParams.get('edit');
@@ -154,6 +155,8 @@ function canDeletePost(post: Post) {
 function canHelpful(post: Post) {
   return Boolean(user && user.id !== post.author_id && !post.is_deleted);
 }
+
+const threadBack = category && thread ? `/categories/${category.slug}/threads/${thread.slug}` : '/';
 ---
 
 <BaseLayout title={thread?.title ?? 'Topic'} user={user} active="browse">
@@ -210,6 +213,7 @@ function canHelpful(post: Post) {
         )}
 
         {formError && <div class="alert">{formError}</div>}
+        {reported && <div class="alert alert--ok">Thanks — your report was submitted.</div>}
 
         <article class="ad-post ad-post--op" id={`post-${op.id}`}>
           <header class="ad-post__head">
@@ -319,6 +323,18 @@ function canHelpful(post: Post) {
                   <a class="ad-pill" href={editHref(op.id)}>
                     Edit
                   </a>
+                )}
+                {user && !op.is_deleted && (
+                  <form method="POST" action="/api/reports" class="inline-form">
+                    <CsrfInput token={csrfToken} />
+                    <input type="hidden" name="target_type" value="post" />
+                    <input type="hidden" name="target_id" value={String(op.id)} />
+                    <input type="hidden" name="reason" value="spam or abuse" />
+                    <input type="hidden" name="back" value={threadBack} />
+                    <button type="submit" class="ad-pill">
+                      Report
+                    </button>
+                  </form>
                 )}
               </div>
             </div>
@@ -464,6 +480,18 @@ function canHelpful(post: Post) {
                       <CsrfInput token={csrfToken} />
                       <button type="submit" class="ad-pill ad-pill--danger">
                         Delete
+                      </button>
+                    </form>
+                  )}
+                  {user && !topReply.is_deleted && (
+                    <form method="POST" action="/api/reports" class="inline-form">
+                      <CsrfInput token={csrfToken} />
+                      <input type="hidden" name="target_type" value="post" />
+                      <input type="hidden" name="target_id" value={String(topReply.id)} />
+                      <input type="hidden" name="reason" value="spam or abuse" />
+                      <input type="hidden" name="back" value={threadBack} />
+                      <button type="submit" class="ad-pill">
+                        Report
                       </button>
                     </form>
                   )}
@@ -627,6 +655,18 @@ function canHelpful(post: Post) {
                           <CsrfInput token={csrfToken} />
                           <button type="submit" class="ad-pill ad-pill--danger">
                             Delete
+                          </button>
+                        </form>
+                      )}
+                      {user && !post.is_deleted && (
+                        <form method="POST" action="/api/reports" class="inline-form">
+                          <CsrfInput token={csrfToken} />
+                          <input type="hidden" name="target_type" value="post" />
+                          <input type="hidden" name="target_id" value={String(post.id)} />
+                          <input type="hidden" name="reason" value="spam or abuse" />
+                          <input type="hidden" name="back" value={threadBack} />
+                          <button type="submit" class="ad-pill">
+                            Report
                           </button>
                         </form>
                       )}

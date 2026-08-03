@@ -21,8 +21,8 @@ use tracing_subscriber::EnvFilter;
 use crate::config::Config;
 use crate::error::AppResult;
 use crate::handlers::{
-    admin_router, auth_router, categories_router, drafts_router, posts_router, search_router,
-    threads_router, users_router,
+    admin_router, auth_router, categories_router, drafts_router, moderation_router, posts_router,
+    search_router, threads_router, users_router,
 };
 use crate::middleware::{CsrfLayer, RateLimitLayer, SecurityHeadersLayer};
 use crate::state::AppState;
@@ -94,6 +94,7 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
                 .merge(search_router())
                 .merge(users_router())
                 .merge(drafts_router())
+                .nest("/mod", moderation_router())
                 .nest("/admin", admin_router()),
         )
         .layer(TraceLayer::new_for_http())

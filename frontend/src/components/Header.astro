@@ -10,6 +10,7 @@ const { user = null, active = null } = Astro.props;
 const display = user ? user.display_name || user.username : '';
 const initial = display ? display.slice(0, 1).toUpperCase() : '';
 const isAdmin = user?.role === 'admin';
+const isStaff = user?.role === 'moderator' || user?.role === 'admin';
 ---
 
 <header class="site-header">
@@ -42,6 +43,11 @@ const isAdmin = user?.role === 'admin';
               <a class="profile-menu__link" href="/settings/profile" role="menuitem">
                 Settings
               </a>
+              {isStaff && (
+                <a class="profile-menu__link" href="/mod" role="menuitem">
+                  Moderation
+                </a>
+              )}
               {isAdmin && (
                 <a class="profile-menu__link" href="/admin" role="menuitem">
                   Admin

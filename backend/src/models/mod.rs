@@ -5,12 +5,16 @@
 
 mod category;
 mod draft;
+mod moderation;
 mod post;
 mod thread;
 mod user;
 
 pub use category::Category;
 pub use draft::Draft;
+pub use moderation::{
+    AuditEntry, Report, ReportView, SanctionKind, UserSanction, UserSanctionView,
+};
 pub use post::{Post, PostEdit, PostView, PostViewJson};
 pub use thread::{Thread, ThreadView};
 pub use user::{ProfilePostItem, ProfileThreadItem, User, UserProfile, UserPublic, UserRole};

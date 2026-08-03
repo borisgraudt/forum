@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::models::{Category, Draft, PostEdit, PostViewJson, ThreadView, UserProfile, UserPublic};
+use crate::models::{
+    AuditEntry, Category, Draft, PostEdit, PostViewJson, Report, ReportView, ThreadView,
+    UserProfile, UserPublic, UserSanction, UserSanctionView,
+};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateCategoryRequest {
@@ -221,4 +224,85 @@ pub struct DraftResponse {
 #[derive(Debug, Serialize)]
 pub struct PostEditListResponse {
     pub edits: Vec<PostEdit>,
+}
+
+// ── v0.4 moderation ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateReportRequest {
+    #[validate(length(min = 1, max = 16))]
+    pub target_type: String,
+    pub target_id: i64,
+    #[validate(length(min = 1, max = 200))]
+    pub reason: String,
+    #[validate(length(max = 2000))]
+    pub details: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ResolveReportRequest {
+    #[validate(length(min = 1, max = 16))]
+    pub status: String,
+    #[validate(length(max = 1000))]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateSanctionRequest {
+    #[validate(length(min = 1, max = 16))]
+    pub kind: String,
+    #[validate(length(max = 500))]
+    pub reason: Option<String>,
+    /// ISO-8601 UTC end time. Required for timeout; optional for mute/ban.
+    pub ends_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReportListQuery {
+    pub status: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+impl ReportListQuery {
+    pub fn limit(&self) -> i64 {
+        self.limit.unwrap_or(30).clamp(1, 100)
+    }
+    pub fn offset(&self) -> i64 {
+        self.offset.unwrap_or(0).max(0)
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReportResponse {
+    pub report: Report,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReportListResponse {
+    pub reports: Vec<ReportView>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SanctionResponse {
+    pub sanction: UserSanction,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SanctionListResponse {
+    pub sanctions: Vec<UserSanctionView>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AuditListResponse {
+    pub entries: Vec<AuditEntry>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
 }

@@ -78,6 +78,7 @@ async fn create_post(
     Json(body): Json<CreatePostRequest>,
 ) -> AppResult<(StatusCode, Json<PostResponse>)> {
     body.validate().map_err(validation_error)?;
+    crate::services::ModerationService::ensure_can_post(&state.db, user.id).await?;
 
     let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
     let thread =
