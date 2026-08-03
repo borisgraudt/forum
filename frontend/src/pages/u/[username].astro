@@ -48,7 +48,10 @@ const recentPosts = profile?.recent_posts ?? [];
           </div>
           <div class="profile-hero__meta">
             <h1 class="profile-hero__name">{display}</h1>
-            <p class="profile-hero__handle">@{p.username}</p>
+            <p class="profile-hero__handle">
+              @{p.username}
+              <span class="profile-hero__id"> · id {p.id}</span>
+            </p>
             {p.role !== 'user' && <span class="profile-hero__badge">{p.role}</span>}
             {p.bio && <p class="profile-hero__bio">{p.bio}</p>}
             <p class="profile-hero__joined">Joined {formatWhen(p.created_at)}</p>

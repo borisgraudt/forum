@@ -1138,6 +1138,57 @@ a.ad-post__name:hover {
   font-size: 14px;
 }
 
+.profile-hero__id {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.mod-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.mod-filters a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.mod-filters a.is-active,
+.mod-filters a:hover {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mod-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mod-sanction-form {
+  margin-bottom: 18px;
+  padding: 14px;
+  background: var(--bg-soft);
+  border-radius: 12px;
+}
+
+.mod-sanction-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.mod-sanction-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .profile-hero__badge {
   display: inline-block;
   margin-top: 8px;

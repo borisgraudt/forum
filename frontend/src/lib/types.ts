@@ -124,3 +124,44 @@ export type SearchHit = {
 export type ApiError = {
   error: string;
 };
+
+export type Report = {
+  id: number;
+  reporter_id: number;
+  reporter_username?: string;
+  target_type: string;
+  target_id: number;
+  reason: string;
+  details?: string | null;
+  status: string;
+  resolved_by?: number | null;
+  resolved_at?: string | null;
+  resolution_note?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserSanction = {
+  id: number;
+  user_id: number;
+  username?: string;
+  kind: string;
+  reason?: string | null;
+  created_by: number;
+  created_by_username?: string;
+  starts_at: string;
+  ends_at?: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type AuditEntry = {
+  id: number;
+  actor_id?: number | null;
+  actor_username?: string | null;
+  action: string;
+  target_type?: string | null;
+  target_id?: number | null;
+  meta?: string | null;
+  created_at: string;
+};

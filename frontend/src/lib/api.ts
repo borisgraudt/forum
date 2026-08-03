@@ -1,14 +1,17 @@
 import type {
   ApiError,
+  AuditEntry,
   Category,
   Draft,
   PageMeta,
   Post,
   PostEdit,
+  Report,
   SearchHit,
   Thread,
   UserProfile,
   UserPublic,
+  UserSanction,
 } from './types';
 
 // Prefer 127.0.0.1 over localhost: Node's fetch resolves localhost to ::1 first,
@@ -235,6 +238,11 @@ export function isAdmin(user: UserPublic | null | undefined): boolean {
   return user?.role === 'admin';
 }
 
+export function isStaff(user: UserPublic | null | undefined): boolean {
+  if (!user) return false;
+  return user.role === 'moderator' || user.role === 'admin';
+}
+
 export async function getUserProfile(username: string, cookie?: string | null) {
   const data = await request<{ profile: UserProfile }>(`/users/${encodeURIComponent(username)}`, {
     cookie,
@@ -276,6 +284,44 @@ export async function listPostEdits(
 export async function listDrafts(cookie?: string | null) {
   const data = await request<{ drafts: Draft[] }>('/drafts', { cookie });
   return data.drafts;
+}
+
+export async function listModReports(
+  cookie?: string | null,
+  opts: { status?: string; limit?: number; offset?: number } = {},
+) {
+  const qs = new URLSearchParams();
+  if (opts.status) qs.set('status', opts.status);
+  if (opts.limit != null) qs.set('limit', String(opts.limit));
+  if (opts.offset != null) qs.set('offset', String(opts.offset));
+  const q = qs.toString();
+  return request<{ reports: Report[] } & PageMeta>(`/mod/reports${q ? `?${q}` : ''}`, { cookie });
+}
+
+export async function listModSanctions(
+  cookie?: string | null,
+  page: { limit?: number; offset?: number } = {},
+) {
+  const qs = new URLSearchParams();
+  if (page.limit != null) qs.set('limit', String(page.limit));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  const q = qs.toString();
+  return request<{ sanctions: UserSanction[] } & PageMeta>(`/mod/sanctions${q ? `?${q}` : ''}`, {
+    cookie,
+  });
+}
+
+export async function listAuditLog(
+  cookie?: string | null,
+  page: { limit?: number; offset?: number } = {},
+) {
+  const qs = new URLSearchParams();
+  if (page.limit != null) qs.set('limit', String(page.limit));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  const q = qs.toString();
+  return request<{ entries: AuditEntry[] } & PageMeta>(`/mod/audit${q ? `?${q}` : ''}`, {
+    cookie,
+  });
 }
 
 export function formatWhen(iso: string | null | undefined): string {

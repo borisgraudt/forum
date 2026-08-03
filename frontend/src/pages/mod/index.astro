@@ -1,0 +1,278 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CsrfInput from '../../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  formatWhen,
+  getCookieHeader,
+  getMe,
+  isStaff,
+  listModReports,
+  listModSanctions,
+  listAuditLog,
+  isAdmin,
+} from '../../lib/api';
+import type { AuditEntry, Report, UserSanction } from '../../lib/types';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+if (!user) return Astro.redirect('/login');
+if (!isStaff(user)) {
+  return new Response(null, { status: 403, statusText: 'Forbidden' });
+}
+
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
+
+const statusFilter = Astro.url.searchParams.get('status') || 'open';
+const error = Astro.url.searchParams.get('error');
+
+let reports: Report[] = [];
+let reportTotal = 0;
+let sanctions: UserSanction[] = [];
+let audit: AuditEntry[] = [];
+let loadError: string | null = null;
+
+try {
+  const [r, s] = await Promise.all([
+    listModReports(cookie, { status: statusFilter, limit: 40 }),
+    listModSanctions(cookie, { limit: 40 }),
+  ]);
+  reports = r.reports;
+  reportTotal = r.total;
+  sanctions = s.sanctions;
+  if (isAdmin(user)) {
+    const a = await listAuditLog(cookie, { limit: 40 });
+    audit = a.entries;
+  }
+} catch (e) {
+  loadError = e instanceof Error ? e.message : 'Could not load mod queue';
+}
+---
+
+<BaseLayout title="Moderation" user={user} active={null}>
+  <div class="admin-page">
+    <header class="admin-page__head">
+      <h1>Moderation</h1>
+      <p>Reports queue, sanctions, and (for admins) the audit trail.</p>
+      <nav class="admin-tabs" aria-label="Mod sections">
+        <a href="#reports">Reports</a>
+        <a href="#sanctions">Sanctions</a>
+        {isAdmin(user) && <a href="#audit">Audit</a>}
+      </nav>
+    </header>
+
+    {error && <div class="alert">{error}</div>}
+    {loadError && <div class="alert">{loadError}</div>}
+
+    <section class="admin-section" id="reports">
+      <div class="admin-section__bar">
+        <h2>Reports</h2>
+        <span class="admin-section__meta">{reportTotal} total</span>
+      </div>
+      <div class="mod-filters">
+        <a href="/mod?status=open#reports" class:list={[{ 'is-active': statusFilter === 'open' }]}
+          >Open</a
+        >
+        <a
+          href="/mod?status=resolved#reports"
+          class:list={[{ 'is-active': statusFilter === 'resolved' }]}>Resolved</a
+        >
+        <a
+          href="/mod?status=dismissed#reports"
+          class:list={[{ 'is-active': statusFilter === 'dismissed' }]}>Dismissed</a
+        >
+      </div>
+
+      {
+        reports.length === 0 ? (
+          <p class="ad-empty">No reports.</p>
+        ) : (
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>By</th>
+                  <th>Target</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((r) => (
+                  <tr>
+                    <td class="admin-table__muted">{formatWhen(r.created_at)}</td>
+                    <td>
+                      <a href={`/u/${r.reporter_username || ''}`}>@{r.reporter_username}</a>
+                    </td>
+                    <td>
+                      {r.target_type} #{r.target_id}
+                    </td>
+                    <td>
+                      <strong>{r.reason}</strong>
+                      {r.details && <div class="admin-table__sub">{r.details}</div>}
+                    </td>
+                    <td>{r.status}</td>
+                    <td>
+                      {r.status === 'open' && (
+                        <div class="mod-actions">
+                          <form method="POST" action="/api/mod/reports" class="inline-form">
+                            <CsrfInput token={csrf.token} />
+                            <input type="hidden" name="report_id" value={String(r.id)} />
+                            <input type="hidden" name="status" value="resolved" />
+                            <button type="submit" class="btn btn-secondary btn-sm">
+                              Resolve
+                            </button>
+                          </form>
+                          <form method="POST" action="/api/mod/reports" class="inline-form">
+                            <CsrfInput token={csrf.token} />
+                            <input type="hidden" name="report_id" value={String(r.id)} />
+                            <input type="hidden" name="status" value="dismissed" />
+                            <button type="submit" class="btn btn-secondary btn-sm">
+                              Dismiss
+                            </button>
+                          </form>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </section>
+
+    <section class="admin-section" id="sanctions">
+      <div class="admin-section__bar">
+        <h2>Active sanctions</h2>
+      </div>
+
+      <form method="POST" action="/api/mod/sanctions" class="mod-sanction-form">
+        <CsrfInput token={csrf.token} />
+        <input type="hidden" name="action" value="create" />
+        <div class="mod-sanction-form__row">
+          <label>
+            User id
+            <input class="admin-input" name="user_id" type="number" required min="1" />
+          </label>
+          <label>
+            Kind
+            <select class="admin-select" name="kind" required>
+              <option value="mute">mute</option>
+              <option value="timeout">timeout</option>
+              {isAdmin(user) && <option value="ban">ban (admin)</option>}
+            </select>
+          </label>
+          <label>
+            Ends at (for timeout)
+            <input class="admin-input" name="ends_at" type="datetime-local" />
+          </label>
+          <label>
+            Reason
+            <input class="admin-input" name="reason" maxlength="500" placeholder="Optional" />
+          </label>
+          <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+        </div>
+        <p class="admin-section__help">
+          Mute/timeout block posting. Ban (admin only) deactivates the account. User id is on the
+          profile page URL is username — use admin user list for numeric ids.
+        </p>
+      </form>
+
+      {
+        sanctions.length === 0 ? (
+          <p class="ad-empty">No active sanctions.</p>
+        ) : (
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Kind</th>
+                  <th>Reason</th>
+                  <th>By</th>
+                  <th>Ends</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {sanctions.map((s) => (
+                  <tr>
+                    <td>
+                      <a href={`/u/${s.username}`}>@{s.username}</a>
+                      <div class="admin-table__sub">id {s.user_id}</div>
+                    </td>
+                    <td>{s.kind}</td>
+                    <td>{s.reason || '—'}</td>
+                    <td class="admin-table__muted">@{s.created_by_username}</td>
+                    <td class="admin-table__muted">
+                      {s.ends_at ? formatWhen(s.ends_at) : 'permanent'}
+                    </td>
+                    <td>
+                      <form method="POST" action="/api/mod/sanctions" class="inline-form">
+                        <CsrfInput token={csrf.token} />
+                        <input type="hidden" name="action" value="lift" />
+                        <input type="hidden" name="sanction_id" value={String(s.id)} />
+                        <button type="submit" class="btn btn-secondary btn-sm">
+                          Lift
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </section>
+
+    {
+      isAdmin(user) && (
+        <section class="admin-section" id="audit">
+          <div class="admin-section__bar">
+            <h2>Audit log</h2>
+          </div>
+          {audit.length === 0 ? (
+            <p class="ad-empty">No audit entries yet.</p>
+          ) : (
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Meta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {audit.map((e) => (
+                    <tr>
+                      <td class="admin-table__muted">{formatWhen(e.created_at)}</td>
+                      <td>{e.actor_username ? `@${e.actor_username}` : '—'}</td>
+                      <td>
+                        <code>{e.action}</code>
+                      </td>
+                      <td class="admin-table__muted">
+                        {e.target_type || '—'}
+                        {e.target_id != null ? ` #${e.target_id}` : ''}
+                      </td>
+                      <td class="admin-table__sub">{e.meta || ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )
+    }
+  </div>
+</BaseLayout>
