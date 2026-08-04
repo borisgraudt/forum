@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Forum API
-  version: 0.8.0
+  version: 0.9.0
   description: |
     Core public API surface. Auth uses httpOnly `session` cookie + double-submit CSRF
     (`csrf` cookie + `X-CSRF-Token` header) on mutating methods.

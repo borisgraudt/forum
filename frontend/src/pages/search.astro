@@ -1,11 +1,20 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCookieHeader, getMe, searchThreads } from '../lib/api';
+import { resolveLocale, t } from '../lib/i18n';
 import type { SearchHit } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
+const locale = resolveLocale(
+  cookie,
+  Astro.request.headers.get('accept-language'),
+  Astro.url.searchParams.get('lang'),
+);
 const user = await getMe(cookie);
 const q = (Astro.url.searchParams.get('q') || '').trim();
+const author = (Astro.url.searchParams.get('author') || '').trim();
+const category = (Astro.url.searchParams.get('category') || '').trim();
+const since = (Astro.url.searchParams.get('since') || '').trim();
 const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
 const limit = 20;
 const offset = (page - 1) * limit;
@@ -16,7 +25,13 @@ let error: string | null = null;
 
 if (q) {
   try {
-    const data = await searchThreads(q, cookie, { limit, offset });
+    const data = await searchThreads(q, cookie, {
+      limit,
+      offset,
+      author: author || undefined,
+      category: category || undefined,
+      since: since || undefined,
+    });
     results = data.results;
     total = data.total;
   } catch (e) {
@@ -25,12 +40,24 @@ if (q) {
 }
 
 const totalPages = Math.max(1, Math.ceil(total / limit));
+
+function pageHref(p: number) {
+  const qs = new URLSearchParams({ q, page: String(p) });
+  if (author) qs.set('author', author);
+  if (category) qs.set('category', category);
+  if (since) qs.set('since', since);
+  return `/search?${qs}`;
+}
 ---
 
-<BaseLayout title={q ? `Search: ${q}` : 'Search'} user={user} active="search">
+<BaseLayout
+  title={q ? `${t(locale, 'search')}: ${q}` : t(locale, 'searchTitle')}
+  user={user}
+  active="search"
+>
   <div class="search-page">
-    <h1 class="page-title">Search</h1>
-    <p class="page-sub">Find threads by title or post content.</p>
+    <h1 class="page-title">{t(locale, 'searchTitle')}</h1>
+    <p class="page-sub">{t(locale, 'searchLead')}</p>
 
     <form class="search-form" method="GET" action="/search">
       <input
@@ -38,13 +65,27 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
         type="search"
         name="q"
         value={q}
-        placeholder="Search topics and posts…"
+        placeholder={t(locale, 'searchPlaceholder')}
         required
         minlength="1"
         maxlength="200"
         autofocus
       />
-      <button class="btn btn-primary" type="submit">Search</button>
+      <button class="btn btn-primary" type="submit">{t(locale, 'searchBtn')}</button>
+      <div class="search-filters">
+        <label>
+          {t(locale, 'filterAuthor')}
+          <input type="text" name="author" value={author} maxlength="32" autocomplete="off" />
+        </label>
+        <label>
+          {t(locale, 'filterCategory')}
+          <input type="text" name="category" value={category} maxlength="80" autocomplete="off" />
+        </label>
+        <label>
+          {t(locale, 'filterSince')}
+          <input type="date" name="since" value={since} />
+        </label>
+      </div>
     </form>
 
     {error && <div class="alert">{error}</div>}
@@ -53,10 +94,10 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
       q && !error && (
         <>
           <p class="search-meta">
-            {total} {total === 1 ? 'result' : 'results'} for “{q}”
+            {total} {t(locale, 'resultsFor')} “{q}”
           </p>
           {results.length === 0 ? (
-            <div class="empty">No matches. Try different keywords.</div>
+            <div class="empty">{t(locale, 'noMatches')}</div>
           ) : (
             <ul class="search-list">
               {results.map((hit) => (
@@ -77,30 +118,24 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
           {totalPages > 1 && (
             <nav class="pager" aria-label="Search pagination">
               {page > 1 ? (
-                <a
-                  class="btn btn-secondary btn-sm"
-                  href={`/search?q=${encodeURIComponent(q)}&page=${page - 1}`}
-                >
-                  Previous
+                <a class="btn btn-secondary btn-sm" href={pageHref(page - 1)}>
+                  {t(locale, 'previous')}
                 </a>
               ) : (
                 <span class="btn btn-secondary btn-sm" aria-disabled="true">
-                  Previous
+                  {t(locale, 'previous')}
                 </span>
               )}
               <span class="pager__meta">
-                Page {page} of {totalPages}
+                {t(locale, 'page')} {page} {t(locale, 'of')} {totalPages}
               </span>
               {page < totalPages ? (
-                <a
-                  class="btn btn-secondary btn-sm"
-                  href={`/search?q=${encodeURIComponent(q)}&page=${page + 1}`}
-                >
-                  Next
+                <a class="btn btn-secondary btn-sm" href={pageHref(page + 1)}>
+                  {t(locale, 'next')}
                 </a>
               ) : (
                 <span class="btn btn-secondary btn-sm" aria-disabled="true">
-                  Next
+                  {t(locale, 'next')}
                 </span>
               )}
             </nav>

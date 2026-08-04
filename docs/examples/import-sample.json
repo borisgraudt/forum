@@ -1,0 +1,24 @@
+{
+  "categories": [
+    {
+      "name": "Imported Community",
+      "slug": "imported",
+      "description": "Sample import root",
+      "children": [
+        {
+          "name": "Imported Sub",
+          "slug": "imported-sub",
+          "description": "Nested under imported"
+        }
+      ]
+    }
+  ],
+  "threads": [
+    {
+      "category_slug": "imported-sub",
+      "title": "Hello from import",
+      "body": "This thread was created by `forum-backend import`.",
+      "author": "admin"
+    }
+  ]
+}

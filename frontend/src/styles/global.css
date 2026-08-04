@@ -1,6 +1,7 @@
 /* Clean community UI — shared page gutters for header + content */
 
 :root {
+  color-scheme: light;
   --bg: #ffffff;
   --bg-soft: #f5f5f7;
   --text: #1d1d1f;
@@ -16,6 +17,9 @@
   --danger: #d70015;
   --danger-bg: #fff5f6;
   --danger-border: #ffd5da;
+  --header-bg: #ffffff;
+  --panel-bg: #ffffff;
+  --panel-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
   --radius: 12px;
   --radius-pill: 980px;
   /* Same horizontal measure for header brand and page title */
@@ -30,6 +34,51 @@
   --font:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
+}
+
+/* Dark theme tokens (explicit + system preference when no override) */
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0f0f10;
+  --bg-soft: #1c1c1e;
+  --text: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-tertiary: #8e8e93;
+  --border: #3a3a3c;
+  --border-soft: #2c2c2e;
+  --ink: #f5f5f7;
+  --ink-hover: #ffffff;
+  --ink-soft: rgba(255, 255, 255, 0.1);
+  --link: #f5f5f7;
+  --danger: #ff453a;
+  --danger-bg: #2c1214;
+  --danger-border: #5c1f24;
+  --header-bg: #0f0f10;
+  --panel-bg: #1c1c1e;
+  --panel-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0f0f10;
+    --bg-soft: #1c1c1e;
+    --text: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #8e8e93;
+    --border: #3a3a3c;
+    --border-soft: #2c2c2e;
+    --ink: #f5f5f7;
+    --ink-hover: #ffffff;
+    --ink-soft: rgba(255, 255, 255, 0.1);
+    --link: #f5f5f7;
+    --danger: #ff453a;
+    --danger-bg: #2c1214;
+    --danger-border: #5c1f24;
+    --header-bg: #0f0f10;
+    --panel-bg: #1c1c1e;
+    --panel-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  }
 }
 
 *,
@@ -142,7 +191,7 @@ p {
   z-index: 50;
   min-height: var(--header-h);
   padding-top: var(--safe-top);
-  background: #fff;
+  background: var(--header-bg, var(--bg));
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -270,12 +319,113 @@ p {
   right: 0;
   top: calc(100% + 8px);
   min-width: 200px;
-  background: #fff;
+  background: var(--panel-bg, var(--bg));
   border: 1px solid var(--border-soft);
   border-radius: 12px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--panel-shadow);
   padding: 8px;
   z-index: 60;
+}
+
+.theme-toggle {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text);
+  min-width: var(--touch);
+  min-height: var(--touch);
+  border-radius: 50%;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  background: var(--ink-soft);
+}
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lang-switch a {
+  min-height: var(--touch);
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 8px;
+}
+.lang-switch a:hover,
+.lang-switch a.is-active {
+  color: var(--text);
+  background: var(--ink-soft);
+  text-decoration: none;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.status-card {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--bg-soft);
+}
+.status-card__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.status-card__value {
+  font-size: 22px;
+  font-weight: 600;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.status-ok {
+  color: #1b7a34;
+}
+html[data-theme='dark'] .status-ok,
+html:not([data-theme='light']) .status-ok {
+  color: #30d158;
+}
+.search-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.search-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.search-filters input,
+.search-filters select {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  min-height: var(--touch);
 }
 
 .profile-menu__who {

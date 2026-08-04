@@ -50,6 +50,9 @@ jobs:
         # Ignores configured in backend/.cargo/audit.toml (sqlx optional mysql→rsa).
         run: cargo audit
 
+      - name: Seed CLI smoke
+        run: cargo run --quiet -- seed
+
   frontend:
     name: Frontend (lint · build · audit)
     runs-on: ubuntu-latest

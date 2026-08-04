@@ -1,34 +1,43 @@
 ---
 import Avatar from './Avatar.astro';
+import { t, type Locale } from '../lib/i18n';
 import type { UserPublic } from '../lib/types';
 
 type Props = {
   user?: UserPublic | null;
   active?: 'ask' | 'browse' | 'search' | null;
   unreadCount?: number;
+  locale?: Locale;
 };
 
-const { user = null, active = null, unreadCount = 0 } = Astro.props;
+const { user = null, active = null, unreadCount = 0, locale = 'en' } = Astro.props;
 const display = user ? user.display_name || user.username : '';
 const isAdmin = user?.role === 'admin';
 const isStaff = user?.role === 'moderator' || user?.role === 'admin';
+const path = Astro.url.pathname;
+const qs = new URLSearchParams(Astro.url.search);
+qs.delete('lang');
+const baseQs = qs.toString();
+const langHref = (lang: string) => `${path}?${baseQs ? `${baseQs}&` : ''}lang=${lang}`;
 ---
 
 <header class="site-header">
   <div class="site-header__inner page-rail">
-    <a class="brand" href="/">Forum</a>
+    <a class="brand" href="/">{t(locale, 'brand')}</a>
 
     <div class="nav-end">
       <nav class="nav-links" aria-label="Primary">
-        <a href="/ask" class:list={[{ 'is-active': active === 'ask' }]}>Ask</a>
-        <a href="/" class:list={[{ 'is-active': active === 'browse' }]}>Browse</a>
-        <a href="/search" class:list={[{ 'is-active': active === 'search' }]}>Search</a>
+        <a href="/ask" class:list={[{ 'is-active': active === 'ask' }]}>{t(locale, 'ask')}</a>
+        <a href="/" class:list={[{ 'is-active': active === 'browse' }]}>{t(locale, 'browse')}</a>
+        <a href="/search" class:list={[{ 'is-active': active === 'search' }]}
+          >{t(locale, 'search')}</a
+        >
         {
           user && (
             <a href="/notifications" class="nav-notif">
-              Alerts
+              {t(locale, 'alerts')}
               {unreadCount > 0 && (
-                <span class="nav-notif__badge" aria-label={`${unreadCount} unread`}>
+                <span class="nav-notif__badge" aria-label={`${unreadCount} ${t(locale, 'unread')}`}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -36,6 +45,25 @@ const isStaff = user?.role === 'moderator' || user?.role === 'admin';
           )
         }
       </nav>
+
+      <nav class="lang-switch" aria-label="Language">
+        <a href={langHref('en')} class:list={[{ 'is-active': locale === 'en' }]} hreflang="en">
+          EN
+        </a>
+        <a href={langHref('ru')} class:list={[{ 'is-active': locale === 'ru' }]} hreflang="ru">
+          RU
+        </a>
+      </nav>
+
+      <button
+        type="button"
+        class="theme-toggle"
+        id="theme-toggle"
+        aria-label={t(locale, 'theme')}
+        title={t(locale, 'theme')}
+      >
+        ◐
+      </button>
 
       {
         user ? (
@@ -51,24 +79,27 @@ const isStaff = user?.role === 'moderator' || user?.role === 'admin';
                 <span class="profile-menu__who-user">@{user.username}</span>
               </div>
               <a class="profile-menu__link" href={`/u/${user.username}`} role="menuitem">
-                Profile
+                {t(locale, 'profile')}
               </a>
               <a class="profile-menu__link" href="/settings/profile" role="menuitem">
-                Settings
+                {t(locale, 'settings')}
+              </a>
+              <a class="profile-menu__link" href="/status" role="menuitem">
+                {t(locale, 'status')}
               </a>
               {isStaff && (
                 <a class="profile-menu__link" href="/mod" role="menuitem">
-                  Moderation
+                  {t(locale, 'moderation')}
                 </a>
               )}
               {isAdmin && (
                 <a class="profile-menu__link" href="/admin" role="menuitem">
-                  Admin
+                  {t(locale, 'admin')}
                 </a>
               )}
               <form method="POST" action="/logout" class="profile-menu__form">
                 <button type="submit" role="menuitem">
-                  Sign out
+                  {t(locale, 'signOut')}
                 </button>
               </form>
             </div>
@@ -77,8 +108,8 @@ const isStaff = user?.role === 'moderator' || user?.role === 'admin';
           <a
             class="profile-btn profile-btn--hit"
             href="/login"
-            title="Sign in"
-            aria-label="Sign in"
+            title={t(locale, 'signIn')}
+            aria-label={t(locale, 'signIn')}
           >
             <svg
               width="18"
@@ -107,4 +138,28 @@ const isStaff = user?.role === 'moderator' || user?.role === 'admin';
       if (!el.contains(t)) el.removeAttribute('open');
     });
   });
+
+  (function themeToggle() {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    function current() {
+      return document.documentElement.getAttribute('data-theme') || 'system';
+    }
+    function setTheme(next: string) {
+      if (next === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+        document.cookie = 'theme=system; Path=/; Max-Age=31536000; SameSite=Lax';
+      } else {
+        document.documentElement.setAttribute('data-theme', next);
+        document.cookie = 'theme=' + next + '; Path=/; Max-Age=31536000; SameSite=Lax';
+      }
+    }
+    btn.addEventListener('click', () => {
+      const cur = current();
+      // light → dark → system → light
+      if (cur === 'light') setTheme('dark');
+      else if (cur === 'dark') setTheme('system');
+      else setTheme('light');
+    });
+  })();
 </script>

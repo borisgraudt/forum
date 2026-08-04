@@ -2,14 +2,14 @@
 	fmt fmt-check test test-backend test-smoke migrate migrate-info db-create db-reset \
 	audit audit-backend audit-frontend clean setup ci \
 	package docker-build docker-up docker-down release-dry \
-	seed backup restore load-smoke
+	seed import backup restore load-smoke
 
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 BACKEND := $(ROOT)/backend
 FRONTEND := $(ROOT)/frontend
 
 export DATABASE_URL ?= sqlite:$(BACKEND)/forum.db?mode=rwc
-export VERSION ?= 0.8.0
+export VERSION ?= 0.9.0
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | \
@@ -121,6 +121,10 @@ test-smoke: ## Smoke e2e (API + frontend BFF). Needs :3000 + :4321 up.
 
 seed: ## Idempotent demo data (admin + sample categories/thread)
 	cd $(BACKEND) && cargo run --quiet -- seed
+
+import: ## Import JSON dump: make import FILE=docs/examples/import-sample.json
+	@test -n "$(FILE)" || (echo "Usage: make import FILE=path.json" && exit 1)
+	cd $(BACKEND) && cargo run --quiet -- import "$(abspath $(FILE))"
 
 backup: ## Snapshot SQLite (+ media) into backups/
 	@bash $(ROOT)/scripts/backup-sqlite.sh "$(BACKEND)/forum.db" "$(ROOT)/backups"

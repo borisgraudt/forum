@@ -125,6 +125,12 @@ pub struct SearchQuery {
     pub q: String,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// Filter by author username (case-insensitive).
+    pub author: Option<String>,
+    /// Filter by category slug.
+    pub category: Option<String>,
+    /// ISO date `YYYY-MM-DD` — only threads with activity on/after this day.
+    pub since: Option<String>,
 }
 
 impl SearchQuery {

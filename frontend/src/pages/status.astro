@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { API_ORIGIN, getCookieHeader, getMe } from '../lib/api';
+import { resolveLocale, t } from '../lib/i18n';
+
+const cookie = getCookieHeader(Astro.request);
+const locale = resolveLocale(
+  cookie,
+  Astro.request.headers.get('accept-language'),
+  Astro.url.searchParams.get('lang'),
+);
+const user = await getMe(cookie);
+
+let healthOk = false;
+let healthMs = 0;
+let metrics: Record<string, number> = {};
+let error: string | null = null;
+
+try {
+  const t0 = Date.now();
+  const h = await fetch(`${API_ORIGIN}/health`, { headers: cookie ? { Cookie: cookie } : {} });
+  healthMs = Date.now() - t0;
+  healthOk = h.ok;
+  const m = await fetch(`${API_ORIGIN}/metrics`);
+  if (m.ok) {
+    const text = await m.text();
+    for (const line of text.split('\n')) {
+      if (!line || line.startsWith('#')) continue;
+      const [k, v] = line.trim().split(/\s+/);
+      if (k && v != null && !Number.isNaN(Number(v))) metrics[k] = Number(v);
+    }
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Status unavailable';
+}
+---
+
+<BaseLayout title={t(locale, 'status')} user={user} description="Forum service status">
+  <h1 class="page-title">{t(locale, 'status')}</h1>
+  <p class="page-sub">Public health of the API process and key counters.</p>
+
+  {error && <div class="alert">{error}</div>}
+
+  <div class="status-grid" role="list">
+    <div class="status-card" role="listitem">
+      <div class="status-card__label">API</div>
+      <div class:list={['status-card__value', { 'status-ok': healthOk }]}>
+        {healthOk ? 'OK' : 'DOWN'}
+      </div>
+    </div>
+    <div class="status-card" role="listitem">
+      <div class="status-card__label">Health latency</div>
+      <div class="status-card__value">{healthMs} ms</div>
+    </div>
+    <div class="status-card" role="listitem">
+      <div class="status-card__label">Users</div>
+      <div class="status-card__value">{metrics.forum_users_total ?? '—'}</div>
+    </div>
+    <div class="status-card" role="listitem">
+      <div class="status-card__label">Threads</div>
+      <div class="status-card__value">{metrics.forum_threads_total ?? '—'}</div>
+    </div>
+    <div class="status-card" role="listitem">
+      <div class="status-card__label">Posts</div>
+      <div class="status-card__value">{metrics.forum_posts_total ?? '—'}</div>
+    </div>
+    <div class="status-card" role="listitem">
+      <div class="status-card__label">Categories</div>
+      <div class="status-card__value">{metrics.forum_categories_total ?? '—'}</div>
+    </div>
+  </div>
+
+  <p class="page-sub">
+    Metrics: <code>/metrics</code> · Ready: <code>/ready</code> · Ops:
+    <a href="https://github.com/borisgraudt/forum/blob/main/docs/ops.md">docs/ops.md</a>
+  </p>
+</BaseLayout>

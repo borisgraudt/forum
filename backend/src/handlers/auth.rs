@@ -69,6 +69,11 @@ async fn register(
     )
     .await?;
 
+    crate::services::hooks::emit(crate::services::hooks::ForumEvent::UserRegistered {
+        user_id: user.id,
+        username: user.username.clone(),
+    });
+
     // Issue email verification token (dev: logged).
     if let Ok(raw) = EmailService::issue_token(&state.db, user.id, "verify", 48).await {
         let link = format!(

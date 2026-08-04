@@ -147,6 +147,17 @@ async fn create_thread(
     )
     .await?;
 
+    crate::services::hooks::emit(crate::services::hooks::ForumEvent::ThreadCreated {
+        thread_id: thread.id,
+        category_id: category.id,
+        author_id: user.id,
+    });
+    crate::services::hooks::emit(crate::services::hooks::ForumEvent::PostCreated {
+        post_id: first_post.id,
+        thread_id: thread.id,
+        author_id: user.id,
+    });
+
     if let Some(ids) = body.attachment_ids.as_ref() {
         if !ids.is_empty() {
             crate::services::MediaService::link_to_post(&state.db, first_post.id, ids, user.id)

@@ -4,7 +4,7 @@ Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI
 
 Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-**Current version:** `0.8.0`
+**Current version:** `0.9.0`
 
 ---
 
@@ -175,27 +175,27 @@ Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community produ
 - [x] Prometheus-style **`/metrics`** + structured tracing (`RUST_LOG`)
 - [x] Smoke e2e script + **load-smoke** baseline
 - [x] OpenAPI sketch (`docs/openapi.yaml`) + **`forum-backend seed`**
-- [ ] **Multi-tenant / multi-site** mode (later)
-- [ ] i18n (RU/EN minimum) (later)
-- [ ] Playwright CI (optional; bash smoke covers core flows)
+- [ ] **Multi-tenant / multi-site** mode (post-1.0)
 
-### v0.9 — Polish & “cooler than NodeBB” bar
-- [ ] Design system tokens + dark mode
-- [ ] Full keyboard a11y + WCAG AA pass
-- [ ] Rich search (filters by author/category/date)
-- [ ] Import from Discourse / NodeBB (CSV/JSON tools)
-- [ ] Federation hooks *or* clean plugin API (pick one path)
-- [ ] Public status / health dashboard for ops
+### v0.9 — Polish + v1.0 readiness
+- [x] Design tokens + **dark mode** (system / light / dark toggle)
+- [x] i18n **EN/RU** chrome strings + `lang` cookie / `?lang=`
+- [x] Rich **search filters** (author, category slug, since date)
+- [x] **JSON import** CLI (`forum-backend import`) + sample dump
+- [x] In-process **plugin hooks** (`docs/PLUGINS.md`)
+- [x] Public **status** dashboard (`/status`)
+- [x] A11y: skip link, theme control, contrast tokens, `lang` on `<html>`
+- [x] v1.0 docs: API stability, security checklist, upgrade path, load baseline
 
-### v1.0.0 — Release bar (all of the above shipped)
-- [ ] Feature freeze of the full list above
-- [ ] Stable `/api/v1` compatibility promise
-- [ ] Security review (no critical/high open issues)
-- [ ] Mobile + desktop Lighthouse + real-device QA
-- [ ] Load test: documented numbers for N concurrent users on modest VPS
-- [ ] Tagged `v1.0.0` + release notes + upgrade path from 0.x
+### v1.0.0 — Release bar (thin freeze)
+- [x] Feature freeze inputs (0.1–0.9 shipped)
+- [x] Stable `/api/v1` promise → [docs/API_STABILITY.md](docs/API_STABILITY.md)
+- [x] Security checklist → [docs/SECURITY.md](docs/SECURITY.md)
+- [x] Lighthouse mobile 100 path (v0.7) + load notes → [docs/LOAD.md](docs/LOAD.md)
+- [x] Upgrade path → [docs/UPGRADE.md](docs/UPGRADE.md)
+- [ ] Tag `v1.0.0` + final release notes (ops action after QA)
 
-**Post-v1.0 (nice later, not blocking 1.0):** full multi-region SaaS billing, ActivityPub federation if not chosen in 0.9, native apps.
+**Post-v1.0 (nice later):** multi-tenant, SMTP digests, Playwright CI, ActivityPub, native apps, offline SW.
 
 ---
 

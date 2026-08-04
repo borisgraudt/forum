@@ -259,11 +259,20 @@ export async function listPosts(
 export async function searchThreads(
   q: string,
   cookie?: string | null,
-  page: { limit?: number; offset?: number } = {},
+  page: {
+    limit?: number;
+    offset?: number;
+    author?: string;
+    category?: string;
+    since?: string;
+  } = {},
 ) {
   const qs = new URLSearchParams({ q });
   if (page.limit != null) qs.set('limit', String(page.limit));
   if (page.offset != null) qs.set('offset', String(page.offset));
+  if (page.author) qs.set('author', page.author);
+  if (page.category) qs.set('category', page.category);
+  if (page.since) qs.set('since', page.since);
   return request<{ results: SearchHit[]; q: string } & PageMeta>(`/search?${qs}`, { cookie });
 }
 

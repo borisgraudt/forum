@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import { getCookieHeader, getUnreadCount } from '../lib/api';
+import { resolveLocale, t, type Locale } from '../lib/i18n';
 import type { UserPublic } from '../lib/types';
 
 type Props = {
@@ -25,7 +26,15 @@ const {
   composer = false,
   live = false,
 } = Astro.props;
-const pageTitle = title === 'Forum' ? 'Forum' : `${title} · Forum`;
+
+const cookie = getCookieHeader(Astro.request);
+const locale: Locale = resolveLocale(
+  cookie,
+  Astro.request.headers.get('accept-language'),
+  Astro.url.searchParams.get('lang'),
+);
+const pageTitle =
+  title === 'Forum' || title === 'Форум' ? t(locale, 'brand') : `${title} · ${t(locale, 'brand')}`;
 const apiBase = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 const apiOrigin = apiBase.replace(/\/api\/v1\/?$/, '');
 const canonical = new URL(Astro.url.pathname, Astro.url.origin).href;
@@ -33,20 +42,29 @@ const canonical = new URL(Astro.url.pathname, Astro.url.origin).href;
 let unreadCount = 0;
 if (user) {
   try {
-    unreadCount = await getUnreadCount(getCookieHeader(Astro.request));
+    unreadCount = await getUnreadCount(cookie);
   } catch {
     unreadCount = 0;
   }
 }
+
+// Persist ?lang= as cookie for subsequent navigations
+if (Astro.url.searchParams.get('lang') === 'en' || Astro.url.searchParams.get('lang') === 'ru') {
+  Astro.response.headers.append(
+    'Set-Cookie',
+    `lang=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`,
+  );
+}
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f0f10" media="(prefers-color-scheme: dark)" />
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
     <meta name="api-origin" content={apiOrigin} />
@@ -58,10 +76,20 @@ if (user) {
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>{pageTitle}</title>
+    <!-- Prevent theme flash: apply saved preference before paint -->
+    <script is:inline>
+      (function () {
+        try {
+          var m = document.cookie.match(/(?:^|; )theme=([^;]+)/);
+          var t = m ? decodeURIComponent(m[1]) : 'system';
+          if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to content</a>
-    <Header user={user} active={active} unreadCount={unreadCount} />
+    <a class="skip-link" href="#main">{t(locale, 'skip')}</a>
+    <Header user={user} active={active} unreadCount={unreadCount} locale={locale} />
     {
       flush ? (
         <main id="main" class="main main--flush" tabindex="-1">
@@ -73,7 +101,6 @@ if (user) {
         </main>
       )
     }
-    {/* Progressive scripts only where needed — keeps Lighthouse TBT near zero. */}
     {composer && <script is:inline src="/composer.js" defer />}
     {live && <script is:inline src="/forum-live.js" defer />}
   </body>

@@ -22,7 +22,12 @@ async fn search(
     let q = query.q.trim().to_string();
     let limit = query.limit();
     let offset = query.offset();
-    let (results, total) = SearchService::search(&state.db, &q, limit, offset).await?;
+    let filters = crate::services::search::SearchFilters {
+        author: query.author.clone(),
+        category: query.category.clone(),
+        since: query.since.clone(),
+    };
+    let (results, total) = SearchService::search(&state.db, &q, limit, offset, &filters).await?;
     Ok((
         StatusCode::OK,
         Json(SearchResponse {

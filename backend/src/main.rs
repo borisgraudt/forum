@@ -26,7 +26,7 @@ use crate::handlers::{
     threads_router, users_router,
 };
 use crate::middleware::{CsrfLayer, RateLimitLayer, SecurityHeadersLayer};
-use crate::services::{SeedService, StorageService};
+use crate::services::{ImportService, SeedService, StorageService};
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -56,18 +56,27 @@ async fn main() -> anyhow::Result<()> {
             println!("{summary}");
             return Ok(());
         }
+        Some("import") => {
+            let path = args
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("usage: forum-backend import <file.json>"))?;
+            let summary = ImportService::from_path(&pool, std::path::Path::new(&path)).await?;
+            println!("{summary}");
+            return Ok(());
+        }
         Some("help") | Some("-h") | Some("--help") => {
             eprintln!(
                 "forum-backend — Forum API\n\n\
                  Usage:\n\
-                   forum-backend           Start HTTP server\n\
-                   forum-backend seed      Idempotent demo data (admin + sample topics)\n\
-                   forum-backend help      Show this help\n"
+                   forum-backend                  Start HTTP server\n\
+                   forum-backend seed             Idempotent demo data (admin + sample topics)\n\
+                   forum-backend import <file>    Import categories/threads from JSON\n\
+                   forum-backend help             Show this help\n"
             );
             return Ok(());
         }
         Some(other) => {
-            anyhow::bail!("unknown command '{other}' (try: seed, help)");
+            anyhow::bail!("unknown command '{other}' (try: seed, import, help)");
         }
         None => {}
     }
