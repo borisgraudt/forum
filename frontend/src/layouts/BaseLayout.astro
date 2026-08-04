@@ -6,15 +6,29 @@ import type { UserPublic } from '../lib/types';
 
 type Props = {
   title?: string;
+  description?: string;
   user?: UserPublic | null;
   active?: 'ask' | 'browse' | 'search' | null;
   flush?: boolean;
+  /** Load progressive composer (markdown toolbar + paste images). */
+  composer?: boolean;
+  /** Load live votes / watch / pulse / lightbox. */
+  live?: boolean;
 };
 
-const { title = 'Forum', user = null, active = null, flush = false } = Astro.props;
+const {
+  title = 'Forum',
+  description = 'Fast community forum — discussions, answers, and media.',
+  user = null,
+  active = null,
+  flush = false,
+  composer = false,
+  live = false,
+} = Astro.props;
 const pageTitle = title === 'Forum' ? 'Forum' : `${title} · Forum`;
 const apiBase = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 const apiOrigin = apiBase.replace(/\/api\/v1\/?$/, '');
+const canonical = new URL(Astro.url.pathname, Astro.url.origin).href;
 
 let unreadCount = 0;
 if (user) {
@@ -30,30 +44,37 @@ if (user) {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="generator" content={Astro.generator} />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
     <meta name="api-origin" content={apiOrigin} />
+    <link rel="canonical" href={canonical} />
     <link rel="preconnect" href={apiOrigin} crossorigin />
     <link rel="dns-prefetch" href={apiOrigin} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>{pageTitle}</title>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <Header user={user} active={active} unreadCount={unreadCount} />
     {
       flush ? (
-        <main class="main main--flush">
+        <main id="main" class="main main--flush" tabindex="-1">
           <slot />
         </main>
       ) : (
-        <main class="main page-rail">
+        <main id="main" class="main page-rail" tabindex="-1">
           <slot />
         </main>
       )
     }
-    <script is:inline src="/composer.js" defer></script>
-    <script is:inline src="/forum-live.js" defer></script>
+    {/* Progressive scripts only where needed — keeps Lighthouse TBT near zero. */}
+    {composer && <script is:inline src="/composer.js" defer />}
+    {live && <script is:inline src="/forum-live.js" defer />}
   </body>
 </html>

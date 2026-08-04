@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "type": "module",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -13,7 +13,9 @@
     "lint": "npm run format:check && npm run check",
     "check": "astro check",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "lh": "lighthouse http://127.0.0.1:4322/ --form-factor=mobile --chrome-flags='--headless --no-sandbox' --view",
+    "lh:ci": "lighthouse http://127.0.0.1:4322/ --form-factor=mobile --chrome-flags='--headless --no-sandbox' --quiet --only-categories=performance,accessibility,best-practices,seo --output=json --output-path=./lighthouse-report.json"
   },
   "dependencies": {
     "@astrojs/node": "^11.0.3",

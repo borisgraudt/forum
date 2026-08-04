@@ -4,7 +4,7 @@ Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI
 
 Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-**Current version:** `0.6.0`
+**Current version:** `0.7.0`
 
 ---
 
@@ -151,14 +151,15 @@ Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community produ
 - [ ] Email digests (needs SMTP — later)
 
 ### v0.7 — Mobile + performance (first-class)
-- [ ] **Phone-first layout**: nav, forms, thread actions, tables → stacks
-- [ ] Touch targets ≥ 44px, safe-area insets, sticky composer on mobile
-- [ ] Responsive images / avatars (`srcset`), no horizontal scroll
-- [ ] PWA install shell (manifest + offline shell optional)
-- [ ] **Perf budget**: TTFB p95 &lt; 50ms local API; Lighthouse mobile Perf ≥ 90
-- [ ] HTTP cache headers for static; SSR data waterfalls eliminated
-- [ ] SQLite WAL + connection/pool tuning; optional read replica later
-- [ ] Bundle hygiene: almost zero client JS except progressive bits
+- [x] **Phone-first layout**: stacked toolbars, reply box, safe-area padding
+- [x] Touch targets ≥ 44px, sticky reply composer on mobile
+- [x] No horizontal scroll; `content-visibility` on topic rows; system fonts only
+- [x] PWA install shell (`manifest.webmanifest`)
+- [x] **Lighthouse-oriented**: skip link, meta description/canonical, contrast AA, reduced motion
+- [x] Cache-Control for static assets; security headers on HTML via Astro middleware
+- [x] Progressive JS only on pages that need it (composer / live) — zero on browse
+- [x] SQLite WAL + page cache / mmap (from 0.6)
+- [ ] Optional: `srcset` variants for large media; offline SW
 
 ### v0.8 — Ops & multi-community scale
 - [ ] Production defaults: HSTS, Secure cookies, reverse-proxy recipes
