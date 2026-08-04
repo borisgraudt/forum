@@ -26,10 +26,17 @@
     return 0;
   }
 
+  /** Prefer getAttribute: a field named "action" shadows form.action (HTML quirk). */
+  function formAction(form) {
+    return form.getAttribute('action') || form.getAttribute('data-action') || '';
+  }
+
   /** Snapshot form fields *before* optimistic UI mutates hidden inputs. */
   async function liveSubmit(form, fd) {
     var body = fd || new FormData(form);
-    var res = await fetch(form.action, {
+    var url = formAction(form);
+    if (!url) throw new Error('form action missing');
+    var res = await fetch(url, {
       method: 'POST',
       body: body,
       credentials: 'same-origin',
