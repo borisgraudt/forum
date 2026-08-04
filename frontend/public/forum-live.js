@@ -233,11 +233,135 @@
     true,
   );
 
+  // ── Lightbox (gallery only, full-res, keyboard) ───────────────────────
+  (function lightbox() {
+    var items = [];
+    var idx = 0;
+    var root = null;
+    var img = null;
+    var meta = null;
+
+    function ensure() {
+      if (root) return root;
+      root = document.createElement('div');
+      root.className = 'lb';
+      root.hidden = true;
+      root.setAttribute('role', 'dialog');
+      root.setAttribute('aria-modal', 'true');
+      root.setAttribute('aria-label', 'Image viewer');
+      root.innerHTML =
+        '<button type="button" class="lb__btn lb__close" aria-label="Close">×</button>' +
+        '<button type="button" class="lb__btn lb__prev" aria-label="Previous">‹</button>' +
+        '<img class="lb__img" alt="" />' +
+        '<button type="button" class="lb__btn lb__next" aria-label="Next">›</button>' +
+        '<div class="lb__meta" aria-live="polite"></div>';
+      document.body.appendChild(root);
+      img = root.querySelector('.lb__img');
+      meta = root.querySelector('.lb__meta');
+      root.querySelector('.lb__close').addEventListener('click', close);
+      root.querySelector('.lb__prev').addEventListener('click', function (e) {
+        e.stopPropagation();
+        show(idx - 1);
+      });
+      root.querySelector('.lb__next').addEventListener('click', function (e) {
+        e.stopPropagation();
+        show(idx + 1);
+      });
+      root.addEventListener('click', function (e) {
+        if (e.target === root) close();
+      });
+      return root;
+    }
+
+    function show(i) {
+      if (!items.length) return;
+      idx = (i + items.length) % items.length;
+      ensure();
+      var it = items[idx];
+      // Swap src only when changed — avoids flash
+      if (img.getAttribute('src') !== it.full) {
+        img.removeAttribute('src');
+        img.src = it.full;
+      }
+      img.alt = it.alt || '';
+      meta.textContent = items.length > 1 ? idx + 1 + ' / ' + items.length : '';
+      root.hidden = false;
+      document.body.classList.add('lb-open');
+      var prev = root.querySelector('.lb__prev');
+      var next = root.querySelector('.lb__next');
+      var multi = items.length > 1;
+      prev.hidden = !multi;
+      next.hidden = !multi;
+    }
+
+    function close() {
+      if (!root || root.hidden) return;
+      root.hidden = true;
+      document.body.classList.remove('lb-open');
+      if (img) img.removeAttribute('src');
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest && e.target.closest('[data-lightbox]');
+      if (!btn) return;
+      e.preventDefault();
+      var gallery = btn.closest('[data-lightbox-gallery]') || document;
+      items = Array.prototype.map.call(gallery.querySelectorAll('[data-lightbox]'), function (el) {
+        return {
+          full: el.getAttribute('data-full') || (el.querySelector('img') && el.querySelector('img').src) || '',
+          alt: (el.querySelector('img') && el.querySelector('img').alt) || '',
+        };
+      }).filter(function (x) {
+        return !!x.full;
+      });
+      var start = parseInt(btn.getAttribute('data-index') || '0', 10) || 0;
+      // Prefer index of clicked button among filtered set
+      var full = btn.getAttribute('data-full');
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].full === full) {
+          start = i;
+          break;
+        }
+      }
+      show(start);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (!root || root.hidden) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') show(idx - 1);
+      else if (e.key === 'ArrowRight') show(idx + 1);
+    });
+
+    // Touch swipe
+    var touchX = null;
+    document.addEventListener(
+      'touchstart',
+      function (e) {
+        if (!root || root.hidden) return;
+        touchX = e.changedTouches[0].clientX;
+      },
+      { passive: true },
+    );
+    document.addEventListener(
+      'touchend',
+      function (e) {
+        if (touchX == null || !root || root.hidden) return;
+        var dx = e.changedTouches[0].clientX - touchX;
+        touchX = null;
+        if (Math.abs(dx) < 40) return;
+        if (dx > 0) show(idx - 1);
+        else show(idx + 1);
+      },
+      { passive: true },
+    );
+  })();
+
   // ── Soft live pulse (tiny JSON, no HTML re-render) ────────────────────
-  var root = document.querySelector('[data-thread-live]');
-  if (!root) return;
-  var cat = root.getAttribute('data-category');
-  var thr = root.getAttribute('data-thread');
+  var liveRoot = document.querySelector('[data-thread-live]');
+  if (!liveRoot) return;
+  var cat = liveRoot.getAttribute('data-category');
+  var thr = liveRoot.getAttribute('data-thread');
   if (!cat || !thr) return;
 
   var apiMeta = document.querySelector('meta[name="api-origin"]');
@@ -257,7 +381,6 @@
     if (p.me_too_count != null) {
       var m = document.querySelector('[data-me-too-count]');
       if (m) m.textContent = String(p.me_too_count);
-      // Sync me-too label count without flipping active state
       var mtForm = document.querySelector('[data-live-me-too]');
       var mtBtn = mtForm && mtForm.querySelector('button');
       if (mtBtn && mtForm.dataset.livePending !== '1') {
@@ -288,7 +411,6 @@
   var timer = null;
   var failStreak = 0;
   function tick() {
-    // Pause when tab hidden — zero wasted work
     if (document.hidden) return;
     fetch(pulseUrl, { credentials: 'omit', cache: 'no-store' })
       .then(function (r) {
@@ -302,7 +424,6 @@
       });
   }
 
-  // Adaptive interval: 1.2s active, backoff on errors, pause when hidden
   function schedule() {
     if (timer) clearInterval(timer);
     var ms = failStreak > 3 ? 5000 : 1200;
@@ -312,7 +433,6 @@
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) tick();
   });
-  // Immediate first pulse after idle (let first paint win)
   if (typeof requestIdleCallback === 'function') {
     requestIdleCallback(tick, { timeout: 800 });
   } else {

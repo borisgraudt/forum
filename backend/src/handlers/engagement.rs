@@ -146,20 +146,31 @@ async fn solve_thread(
 async fn thread_pulse(
     State(state): State<AppState>,
     Path((category_slug, thread_slug)): Path<(String, String)>,
-) -> AppResult<(StatusCode, Json<ThreadPulseResponse>)> {
+) -> AppResult<axum::response::Response> {
+    use axum::response::IntoResponse;
     let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
     let thread =
         ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
+    let body = ThreadPulseResponse {
+        post_count: thread.post_count,
+        me_too_count: thread.me_too_count,
+        view_count: thread.view_count,
+        is_solved: thread.is_solved,
+        last_post_at: thread.last_post_at,
+    };
+    // Short private cache so parallel tabs coalesce; still feels live.
     Ok((
         StatusCode::OK,
-        Json(ThreadPulseResponse {
-            post_count: thread.post_count,
-            me_too_count: thread.me_too_count,
-            view_count: thread.view_count,
-            is_solved: thread.is_solved,
-            last_post_at: thread.last_post_at,
-        }),
-    ))
+        [
+            (
+                axum::http::header::CACHE_CONTROL,
+                "private, max-age=1, stale-while-revalidate=2",
+            ),
+            (axum::http::header::CONTENT_TYPE, "application/json"),
+        ],
+        axum::Json(body),
+    )
+        .into_response())
 }
 
 /// SSE stream: emits pulse JSON when post_count / me_too / solved change.

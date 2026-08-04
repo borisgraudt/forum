@@ -719,11 +719,118 @@ p {
   margin-top: 14px;
 }
 
+.post-media__item {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 10px;
+  overflow: hidden;
+  line-height: 0;
+  max-width: min(100%, 360px);
+}
+
+.post-media__item:focus-visible {
+  outline: 2px solid var(--accent, #0071e3);
+  outline-offset: 2px;
+}
+
 .post-media img {
   max-width: min(100%, 360px);
   max-height: 280px;
+  width: auto;
+  height: auto;
   border-radius: 10px;
   display: block;
+  object-fit: cover;
+}
+
+/* Fullscreen lightbox — zero deps */
+.lb {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.88);
+  padding: 16px;
+  overscroll-behavior: contain;
+}
+
+.lb[hidden] {
+  display: none !important;
+}
+
+.lb__img {
+  max-width: min(96vw, 1400px);
+  max-height: min(90vh, 1400px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.lb__btn {
+  appearance: none;
+  border: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  transition: background 0.12s ease;
+}
+
+.lb__btn:hover,
+.lb__btn:focus-visible {
+  background: rgba(255, 255, 255, 0.22);
+  outline: none;
+}
+
+.lb__close {
+  top: 12px;
+  right: 12px;
+  font-size: 28px;
+}
+
+.lb__prev {
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lb__next {
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lb__meta {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+body.lb-open {
+  overflow: hidden;
 }
 
 .embed-list {
