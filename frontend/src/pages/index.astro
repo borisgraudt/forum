@@ -92,7 +92,7 @@ try {
               ) : (
                 <p class="cat-list__empty">
                   No subcategories
-                  {user && (
+                  {isAdmin(user) && (
                     <>
                       {' '}
                       · <a href={`/categories/new?parent=${root.slug}`}>add</a>
