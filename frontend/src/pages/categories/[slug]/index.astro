@@ -66,7 +66,13 @@ const showSubs = isRoot && children.length > 0;
 const totalPages = Math.max(1, Math.ceil(total / limit));
 ---
 
-<BaseLayout title={category?.name ?? 'Forum'} user={user} active="browse">
+<BaseLayout
+  title={category?.name ?? 'Forum'}
+  description={category?.description || (category ? `${category.name} topics` : 'Forum')}
+  user={user}
+  active="browse"
+  live
+>
   {
     error || !category ? (
       <div class="alert">{error || 'Not found'}</div>

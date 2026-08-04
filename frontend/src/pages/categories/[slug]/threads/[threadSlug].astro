@@ -170,7 +170,14 @@ function canHelpful(post: Post) {
 const threadBack = category && thread ? `/categories/${category.slug}/threads/${thread.slug}` : '/';
 ---
 
-<BaseLayout title={thread?.title ?? 'Topic'} user={user} active="browse">
+<BaseLayout
+  title={thread?.title ?? 'Topic'}
+  description={thread?.title ? `${thread.title} — discussion` : 'Topic'}
+  user={user}
+  active="browse"
+  composer
+  live
+>
   {
     error || !category || !thread || !op ? (
       <div class="alert">{error || 'Not found'}</div>
