@@ -26,11 +26,12 @@
     return 0;
   }
 
-  async function liveSubmit(form) {
-    var fd = new FormData(form);
+  /** Snapshot form fields *before* optimistic UI mutates hidden inputs. */
+  async function liveSubmit(form, fd) {
+    var body = fd || new FormData(form);
     var res = await fetch(form.action, {
       method: 'POST',
-      body: fd,
+      body: body,
       credentials: 'same-origin',
       headers: wantsJson(),
     });
@@ -58,7 +59,9 @@
       var action = (hidden && hidden.value) || 'add';
       var prevVoted = action === 'remove';
       var prevCount = parseCountLabel(btn && btn.textContent);
-      // Optimistic flip
+      // Capture payload before optimistic flip (otherwise action is already inverted).
+      var fd = new FormData(form);
+
       var nextVoted = !prevVoted;
       var nextCount = Math.max(0, prevCount + (nextVoted ? 1 : -1));
       if (hidden) hidden.value = nextVoted ? 'remove' : 'add';
@@ -71,7 +74,7 @@
 
       form.dataset.livePending = '1';
       setBusy(btn, true);
-      liveSubmit(form)
+      liveSubmit(form, fd)
         .then(function (data) {
           var count = data.count != null ? data.count : nextCount;
           var voted = data.viewer_voted != null ? !!data.viewer_voted : nextVoted;
@@ -84,7 +87,6 @@
         })
         .catch(function (err) {
           console.warn(err);
-          // Revert
           if (hidden) hidden.value = prevVoted ? 'remove' : 'add';
           if (btn) {
             btn.classList.toggle('ad-pill--active', prevVoted);
@@ -113,7 +115,8 @@
       var hidden = form.querySelector('input[name="action"]');
       var action = (hidden && hidden.value) || 'add';
       var prevVoted = action === 'remove';
-      var prevCount = parseCountLabel(btn && btn.textContent);
+      var prevCount = parseCountLabel(btn && (btn.textContent || ''));
+      var fd = new FormData(form); // before optimistic flip
       var nextVoted = !prevVoted;
       var nextCount = Math.max(0, prevCount + (nextVoted ? 1 : -1));
 
@@ -130,7 +133,7 @@
 
       form.dataset.livePending = '1';
       setBusy(btn, true);
-      liveSubmit(form)
+      liveSubmit(form, fd)
         .then(function (data) {
           paint(
             data.viewer_voted != null ? !!data.viewer_voted : nextVoted,
@@ -162,6 +165,7 @@
       var act = form.querySelector('input[name="action"]');
       var prev = (act && act.value) === 'unwatch';
       var next = !prev;
+      var fd = new FormData(form);
       function paint(watching) {
         if (btn) {
           btn.textContent = watching ? 'Watching' : 'Watch';
@@ -174,7 +178,7 @@
 
       form.dataset.livePending = '1';
       setBusy(btn, true);
-      liveSubmit(form)
+      liveSubmit(form, fd)
         .then(function (data) {
           paint(data.watching != null ? !!data.watching : next);
         })
@@ -201,10 +205,13 @@
 
       var btn = form.querySelector('button[type="submit"]');
       var solvedInput = form.querySelector('input[name="is_solved"]');
-      var prev = solvedInput && solvedInput.value === '1';
-      var next = !prev;
+      // Form holds the *next* action: "1" = mark solved, "0" = unsolve.
+      var fd = new FormData(form);
+      var currentlySolved = solvedInput && solvedInput.value === '0';
+      var nextSolved = !currentlySolved;
       function paint(solved) {
-        if (solvedInput) solvedInput.value = solved ? '1' : '0';
+        // Store the *next* action in the form (toggle)
+        if (solvedInput) solvedInput.value = solved ? '0' : '1';
         if (btn) {
           btn.textContent = solved ? 'Solved' : 'Mark solved';
           btn.classList.toggle('ad-pill--active', solved);
@@ -212,18 +219,18 @@
         var badge = document.querySelector('[data-solved-badge]');
         if (badge) badge.hidden = !solved;
       }
-      paint(next);
+      paint(nextSolved);
 
       form.dataset.livePending = '1';
       setBusy(btn, true);
-      liveSubmit(form)
+      liveSubmit(form, fd)
         .then(function (data) {
           var t = data.thread || data;
-          paint(t.is_solved != null ? !!t.is_solved : next);
+          paint(t.is_solved != null ? !!t.is_solved : nextSolved);
         })
         .catch(function (err) {
           console.warn(err);
-          paint(prev);
+          paint(currentlySolved);
         })
         .finally(function () {
           form.dataset.livePending = '0';
