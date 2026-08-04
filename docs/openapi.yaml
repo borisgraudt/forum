@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: Forum API
+  version: 0.8.0
+  description: |
+    Core public API surface. Auth uses httpOnly `session` cookie + double-submit CSRF
+    (`csrf` cookie + `X-CSRF-Token` header) on mutating methods.
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    get:
+      summary: Liveness (also available at /health root)
+      responses:
+        '200':
+          description: OK
+  /auth/csrf:
+    get:
+      summary: Issue or return CSRF token + cookie
+      responses:
+        '200':
+          description: CSRF token JSON
+  /auth/register:
+    post:
+      summary: Register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username: { type: string }
+                email: { type: string }
+                password: { type: string }
+                display_name: { type: string }
+      responses:
+        '201': { description: Created + session cookie }
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, password]
+              properties:
+                login: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: OK + session cookie }
+  /auth/me:
+    get:
+      summary: Current user
+      responses:
+        '200': { description: User }
+        '401': { description: Unauthorized }
+  /categories:
+    get:
+      summary: List root communities
+      responses:
+        '200': { description: Category list }
+  /categories/{slug}/threads:
+    get:
+      summary: List threads in category
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [activity, newest, unanswered, solved] }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: offset
+          schema: { type: integer }
+      responses:
+        '200': { description: Thread list }
+  /search:
+    get:
+      summary: Full-text search
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Hits }
+  /notifications:
+    get:
+      summary: List notifications
+      responses:
+        '200': { description: Notification list }
+  /notifications/unread-count:
+    get:
+      summary: Unread notification count
+      responses:
+        '200': { description: Count }

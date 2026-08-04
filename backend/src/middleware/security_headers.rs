@@ -6,19 +6,31 @@ use std::task::{Context, Poll};
 use tower::{Layer, Service};
 
 #[derive(Clone, Copy, Default)]
-pub struct SecurityHeadersLayer;
+pub struct SecurityHeadersLayer {
+    pub enable_hsts: bool,
+}
+
+impl SecurityHeadersLayer {
+    pub fn new(enable_hsts: bool) -> Self {
+        Self { enable_hsts }
+    }
+}
 
 impl<S> Layer<S> for SecurityHeadersLayer {
     type Service = SecurityHeadersService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        SecurityHeadersService { inner }
+        SecurityHeadersService {
+            inner,
+            enable_hsts: self.enable_hsts,
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct SecurityHeadersService<S> {
     inner: S,
+    enable_hsts: bool,
 }
 
 impl<S, B, ResBody> Service<Request<B>> for SecurityHeadersService<S>
@@ -37,6 +49,7 @@ where
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
         let mut inner = self.inner.clone();
+        let enable_hsts = self.enable_hsts;
         Box::pin(async move {
             let mut res = inner.call(req).await?;
             let headers = res.headers_mut();
@@ -65,6 +78,13 @@ where
                 header::HeaderName::from_static("x-permitted-cross-domain-policies"),
                 HeaderValue::from_static("none"),
             );
+
+            if enable_hsts {
+                headers.insert(
+                    header::STRICT_TRANSPORT_SECURITY,
+                    HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+                );
+            }
 
             Ok(res)
         })

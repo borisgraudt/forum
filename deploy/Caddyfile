@@ -1,0 +1,35 @@
+# Example reverse proxy for Forum (TLS + static-ish UI + API).
+# Replace forum.example.com and paths as needed.
+#
+#   caddy run --config deploy/Caddyfile
+
+forum.example.com {
+	encode gzip zstd
+
+	# Security headers for HTML UI
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# API + media
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle /media/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle /health {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle /metrics {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# Astro SSR UI
+	handle {
+		reverse_proxy 127.0.0.1:4321
+	}
+}
