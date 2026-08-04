@@ -33,5 +33,7 @@ pub struct ThreadView {
     pub updated_at: String,
     pub author_username: String,
     pub author_display_name: Option<String>,
+    /// Absolute-path media URL (`/media/...`) when the author has an avatar.
+    pub author_avatar_url: Option<String>,
     pub me_too_count: i64,
 }

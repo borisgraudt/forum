@@ -514,16 +514,8 @@ p {
 }
 
 .topic-list__avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #e8e8ed;
-  color: #6e6e73;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  font-weight: 600;
   flex-shrink: 0;
+  /* size comes from Avatar component; keep grid alignment */
 }
 
 .topic-list__main {

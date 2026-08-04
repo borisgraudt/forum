@@ -79,6 +79,7 @@ export type Thread = {
   updated_at: string;
   author_username: string;
   author_display_name: string | null;
+  author_avatar_url?: string | null;
 };
 
 export type Post = {
