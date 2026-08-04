@@ -2,6 +2,11 @@
 backend/target/
 backend/forum.db
 backend/forum.db-*
+forum.db
+forum.db-*
+**/forum.db
+**/forum.db-*
+/backups/
 **/*.rs.bk
 
 # Node / Astro
