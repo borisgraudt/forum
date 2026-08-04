@@ -320,14 +320,19 @@
       if (!btn) return;
       e.preventDefault();
       var gallery = btn.closest('[data-lightbox-gallery]') || document;
-      items = Array.prototype.map.call(gallery.querySelectorAll('[data-lightbox]'), function (el) {
-        return {
-          full: el.getAttribute('data-full') || (el.querySelector('img') && el.querySelector('img').src) || '',
-          alt: (el.querySelector('img') && el.querySelector('img').alt) || '',
-        };
-      }).filter(function (x) {
-        return !!x.full;
-      });
+      items = Array.prototype.map
+        .call(gallery.querySelectorAll('[data-lightbox]'), function (el) {
+          return {
+            full:
+              el.getAttribute('data-full') ||
+              (el.querySelector('img') && el.querySelector('img').src) ||
+              '',
+            alt: (el.querySelector('img') && el.querySelector('img').alt) || '',
+          };
+        })
+        .filter(function (x) {
+          return !!x.full;
+        });
       var start = parseInt(btn.getAttribute('data-index') || '0', 10) || 0;
       // Prefer index of clicked button among filtered set
       var full = btn.getAttribute('data-full');
