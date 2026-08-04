@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import Header from '../components/Header.astro';
+import { getCookieHeader, getUnreadCount } from '../lib/api';
 import type { UserPublic } from '../lib/types';
 
 type Props = {
@@ -12,6 +13,17 @@ type Props = {
 
 const { title = 'Forum', user = null, active = null, flush = false } = Astro.props;
 const pageTitle = title === 'Forum' ? 'Forum' : `${title} · Forum`;
+const apiBase = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
+const apiOrigin = apiBase.replace(/\/api\/v1\/?$/, '');
+
+let unreadCount = 0;
+if (user) {
+  try {
+    unreadCount = await getUnreadCount(getCookieHeader(Astro.request));
+  } catch {
+    unreadCount = 0;
+  }
+}
 ---
 
 <!doctype html>
@@ -21,12 +33,15 @@ const pageTitle = title === 'Forum' ? 'Forum' : `${title} · Forum`;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content="#ffffff" />
+    <meta name="api-origin" content={apiOrigin} />
+    <link rel="preconnect" href={apiOrigin} crossorigin />
+    <link rel="dns-prefetch" href={apiOrigin} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <title>{pageTitle}</title>
   </head>
   <body>
-    <Header user={user} active={active} />
+    <Header user={user} active={active} unreadCount={unreadCount} />
     {
       flush ? (
         <main class="main main--flush">
@@ -39,5 +54,6 @@ const pageTitle = title === 'Forum' ? 'Forum' : `${title} · Forum`;
       )
     }
     <script is:inline src="/composer.js" defer></script>
+    <script is:inline src="/forum-live.js" defer></script>
   </body>
 </html>

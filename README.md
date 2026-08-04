@@ -4,7 +4,7 @@ Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI
 
 Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-**Current version:** `0.5.0`
+**Current version:** `0.6.0`
 
 ---
 
@@ -141,12 +141,14 @@ Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community produ
 - [x] **Password reset** + email verify tokens (dev log transport; SMTP later)
 
 ### v0.6 — Discovery, engagement, realtime
-- [ ] **Notifications** (in-app + email digests)
-- [ ] **Watch / subscribe** thread & category
-- [ ] **Sort / filters** (activity, newest, unanswered, solved)
-- [ ] **Solved / accepted answer**
-- [ ] **Realtime** updates (websockets or SSE: new replies, live counts)
-- [ ] **Unreads** badges
+- [x] **Notifications** in-app (`/notifications`, deep links, mark read, unread badge)
+- [x] **Watch / subscribe** thread + category (auto-watch on reply + create)
+- [x] **Sort / filters** (activity, newest, unanswered, solved)
+- [x] **Solved** mark for OP/staff
+- [x] **Live counts** pulse (~1.2s) + SSE endpoint; Me too / Helpful / Watch without full page reload (optimistic UI)
+- [x] **Unreads** for watched threads
+- [x] **Photo gallery** + lightbox viewer
+- [ ] Email digests (needs SMTP — later)
 
 ### v0.7 — Mobile + performance (first-class)
 - [ ] **Phone-first layout**: nav, forms, thread actions, tables → stacks

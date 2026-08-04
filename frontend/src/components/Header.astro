@@ -5,9 +5,10 @@ import type { UserPublic } from '../lib/types';
 type Props = {
   user?: UserPublic | null;
   active?: 'ask' | 'browse' | 'search' | null;
+  unreadCount?: number;
 };
 
-const { user = null, active = null } = Astro.props;
+const { user = null, active = null, unreadCount = 0 } = Astro.props;
 const display = user ? user.display_name || user.username : '';
 const isAdmin = user?.role === 'admin';
 const isStaff = user?.role === 'moderator' || user?.role === 'admin';
@@ -22,6 +23,16 @@ const isStaff = user?.role === 'moderator' || user?.role === 'admin';
         <a href="/ask" class:list={[{ 'is-active': active === 'ask' }]}>Ask</a>
         <a href="/" class:list={[{ 'is-active': active === 'browse' }]}>Browse</a>
         <a href="/search" class:list={[{ 'is-active': active === 'search' }]}>Search</a>
+        {
+          user && (
+            <a href="/notifications" class="nav-notif">
+              Alerts
+              {unreadCount > 0 && (
+                <span class="nav-notif__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
+            </a>
+          )
+        }
       </nav>
 
       {

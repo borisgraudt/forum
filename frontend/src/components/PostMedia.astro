@@ -14,17 +14,30 @@ const embs = embeds ?? [];
 
 {
   atts.length > 0 && (
-    <div class="post-media">
-      {atts.map((a) => (
-        <a href={mediaUrl(a.url)!} target="_blank" rel="noopener">
-          <img
-            src={mediaUrl(a.thumb_url || a.url)!}
-            alt={a.original_name || ''}
-            loading="lazy"
-            decoding="async"
-          />
-        </a>
-      ))}
+    <div class="post-media" data-lightbox-gallery>
+      {atts.map((a, i) => {
+        const full = mediaUrl(a.url)!;
+        const thumb = mediaUrl(a.thumb_url || a.url)!;
+        return (
+          <button
+            type="button"
+            class="post-media__item"
+            data-lightbox
+            data-full={full}
+            data-index={i}
+            aria-label={a.original_name ? `View ${a.original_name}` : `View image ${i + 1}`}
+          >
+            <img
+              src={thumb}
+              alt={a.original_name || ''}
+              loading="lazy"
+              decoding="async"
+              width={a.width || undefined}
+              height={a.height || undefined}
+            />
+          </button>
+        );
+      })}
     </div>
   )
 }

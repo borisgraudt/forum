@@ -122,8 +122,14 @@ const replyToPost =
 
 function bodyHtml(post: Post) {
   let h = post.body_html || post.body || '';
-  // Markdown images use /media/* on API host — rewrite for browser.
+  // Uploaded photos live in the bottom gallery (PostMedia) — strip inline
+  // ![](/media/...) so old posts don't double-render.
+  h = h.replace(/<p>\s*<img\b[^>]*\/media\/[^>]*>\s*<\/p>/gi, '');
+  h = h.replace(/<img\b[^>]*\/media\/[^>]*>/gi, '');
+  // Other markdown images (external) still need absolute API host if any /media left.
   h = h.replace(/(src|href)="\/media\//g, `$1="${API_ORIGIN}/media/`);
+  // Collapse empty paragraphs left after strip.
+  h = h.replace(/<p>\s*<\/p>/gi, '');
   return h;
 }
 
@@ -169,7 +175,12 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
     error || !category || !thread || !op ? (
       <div class="alert">{error || 'Not found'}</div>
     ) : (
-      <div class="ad-thread">
+      <div
+        class="ad-thread"
+        data-thread-live
+        data-category={category.slug}
+        data-thread={thread.slug}
+      >
         <div class="ad-thread__top">
           <nav class="breadcrumb ad-thread__crumbs" aria-label="Breadcrumb">
             <a href="/">Browse</a>
@@ -184,7 +195,56 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
             <span class="breadcrumb__sep">/</span>
             <span aria-current="page">{thread.title}</span>
           </nav>
-          <span class="ad-thread__views">{views} views</span>
+          <div class="ad-thread__meta">
+            <span class="ad-thread__views">
+              <span data-post-count>{thread.post_count}</span> posts · {views} views ·{' '}
+              <span data-me-too-count>{meTooCount}</span> me too
+            </span>
+            <span class="ad-post__badge" data-solved-badge hidden={!thread.is_solved}>
+              Solved
+            </span>
+            {user && (
+              <form
+                method="POST"
+                action={`/api/categories/${category.slug}/threads/${thread.slug}/watch`}
+                class="inline-form"
+                data-live-watch
+              >
+                <CsrfInput token={csrfToken} />
+                <input
+                  type="hidden"
+                  name="action"
+                  value={thread.viewer_watching ? 'unwatch' : 'watch'}
+                />
+                <button
+                  type="submit"
+                  class:list={['ad-pill', { 'ad-pill--active': thread.viewer_watching }]}
+                >
+                  {thread.viewer_watching ? 'Watching' : 'Watch'}
+                </button>
+              </form>
+            )}
+            {user && (user.id === thread.author_id || canMod) && (
+              <form
+                method="POST"
+                action={`/api/categories/${category.slug}/threads/${thread.slug}/solve`}
+                class="inline-form"
+                data-live-solve
+              >
+                <CsrfInput token={csrfToken} />
+                <input type="hidden" name="is_solved" value={thread.is_solved ? '0' : '1'} />
+                <button
+                  type="submit"
+                  class:list={['ad-pill', { 'ad-pill--active': thread.is_solved }]}
+                >
+                  {thread.is_solved ? 'Solved' : 'Mark solved'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+        <div class="live-banner" data-live-banner hidden>
+          New replies available. <a href="#">Refresh</a>
         </div>
 
         {canMod && (
@@ -306,6 +366,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                       method="POST"
                       action={`/api/categories/${category.slug}/threads/${thread.slug}/me-too`}
                       class="inline-form"
+                      data-live-me-too
                     >
                       <CsrfInput token={csrfToken} />
                       <input type="hidden" name="action" value={viewerMeToo ? 'remove' : 'add'} />
@@ -446,6 +507,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                       method="POST"
                       action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${topReply.id}/helpful`}
                       class="inline-form"
+                      data-live-helpful
                     >
                       <CsrfInput token={csrfToken} />
                       <input
@@ -624,6 +686,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                           method="POST"
                           action={`/api/categories/${category.slug}/threads/${thread.slug}/posts/${post.id}/helpful`}
                           class="inline-form"
+                          data-live-helpful
                         >
                           <CsrfInput token={csrfToken} />
                           <input

@@ -6,7 +6,8 @@ use crate::models::{Post, PostView, Thread, ThreadView};
 const THREAD_VIEW_SELECT: &str = r#"
     SELECT
         t.id, t.category_id, t.author_id, t.title, t.slug,
-        t.is_pinned, t.is_locked, t.post_count, t.view_count, t.last_post_at,
+        t.is_pinned, t.is_locked, t.post_count, t.view_count,
+        t.is_solved, t.accepted_post_id, t.last_post_at,
         t.created_at, t.updated_at,
         u.username AS author_username,
         u.display_name AS author_display_name,
@@ -41,11 +42,28 @@ impl ThreadService {
         category_id: i64,
         limit: i64,
         offset: i64,
+        sort: &str,
     ) -> AppResult<Vec<ThreadView>> {
+        let order = match sort {
+            "newest" => "t.is_pinned DESC, t.created_at DESC, t.id DESC",
+            "unanswered" => {
+                "t.is_pinned DESC, t.post_count ASC, COALESCE(t.last_post_at, t.created_at) DESC"
+            }
+            "solved" => {
+                "t.is_pinned DESC, t.is_solved DESC, COALESCE(t.last_post_at, t.created_at) DESC"
+            }
+            // activity (default)
+            _ => "t.is_pinned DESC, COALESCE(t.last_post_at, t.created_at) DESC",
+        };
+        let filter = match sort {
+            "unanswered" => "AND t.post_count <= 1 AND t.is_solved = 0",
+            "solved" => "AND t.is_solved = 1",
+            _ => "",
+        };
         let sql = format!(
             "{THREAD_VIEW_SELECT}
-            WHERE t.category_id = ?
-            ORDER BY t.is_pinned DESC, COALESCE(t.last_post_at, t.created_at) DESC
+            WHERE t.category_id = ? {filter}
+            ORDER BY {order}
             LIMIT ? OFFSET ?"
         );
         let rows = sqlx::query_as::<_, ThreadView>(&sql)
@@ -57,12 +75,21 @@ impl ThreadService {
         Ok(rows)
     }
 
-    pub async fn count_by_category(db: &SqlitePool, category_id: i64) -> AppResult<i64> {
-        let count =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM threads WHERE category_id = ?")
-                .bind(category_id)
-                .fetch_one(db)
-                .await?;
+    pub async fn count_by_category_sorted(
+        db: &SqlitePool,
+        category_id: i64,
+        sort: &str,
+    ) -> AppResult<i64> {
+        let filter = match sort {
+            "unanswered" => "AND post_count <= 1 AND is_solved = 0",
+            "solved" => "AND is_solved = 1",
+            _ => "",
+        };
+        let sql = format!("SELECT COUNT(*) FROM threads WHERE category_id = ? {filter}");
+        let count = sqlx::query_scalar::<_, i64>(&sql)
+            .bind(category_id)
+            .fetch_one(db)
+            .await?;
         Ok(count)
     }
 
@@ -275,5 +302,36 @@ impl ThreadService {
         let thread = Self::get_view_by_id(db, thread.id).await?;
         let first_post = Self::get_post_view(db, post.id).await?;
         Ok((thread, first_post))
+    }
+
+    pub async fn set_solved(
+        db: &SqlitePool,
+        thread_id: i64,
+        is_solved: bool,
+        accepted_post_id: Option<i64>,
+    ) -> AppResult<ThreadView> {
+        if let Some(pid) = accepted_post_id {
+            let post = Self::get_post_view(db, pid).await?;
+            if post.thread_id != thread_id {
+                return Err(AppError::BadRequest(
+                    "accepted_post_id must belong to this thread".into(),
+                ));
+            }
+        }
+        sqlx::query(
+            r#"
+            UPDATE threads
+            SET is_solved = ?,
+                accepted_post_id = ?,
+                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id = ?
+            "#,
+        )
+        .bind(is_solved)
+        .bind(accepted_post_id)
+        .bind(thread_id)
+        .execute(db)
+        .await?;
+        Self::get_view_by_id(db, thread_id).await
     }
 }

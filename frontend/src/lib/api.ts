@@ -162,10 +162,12 @@ export async function listRootCategories(cookie?: string | null) {
 }
 
 export async function getCategory(slug: string, cookie?: string | null) {
-  return request<{ category: Category; children?: Category[]; parent?: Category | null }>(
-    `/categories/${encodeURIComponent(slug)}`,
-    { cookie },
-  );
+  return request<{
+    category: Category;
+    children?: Category[];
+    parent?: Category | null;
+    viewer_watching?: boolean | null;
+  }>(`/categories/${encodeURIComponent(slug)}`, { cookie });
 }
 
 export async function listChildren(slug: string, cookie?: string | null) {
@@ -179,17 +181,55 @@ export async function listChildren(slug: string, cookie?: string | null) {
 export async function listThreads(
   categorySlug: string,
   cookie?: string | null,
-  page: { limit?: number; offset?: number } = {},
+  page: { limit?: number; offset?: number; sort?: string } = {},
 ) {
   const qs = new URLSearchParams();
   if (page.limit != null) qs.set('limit', String(page.limit));
   if (page.offset != null) qs.set('offset', String(page.offset));
+  if (page.sort) qs.set('sort', page.sort);
   const q = qs.toString();
   const data = await request<{ threads: Thread[] } & PageMeta>(
     `/categories/${encodeURIComponent(categorySlug)}/threads${q ? `?${q}` : ''}`,
     { cookie },
   );
   return data;
+}
+
+export async function getUnreadCount(cookie?: string | null) {
+  try {
+    const data = await request<{ count: number }>('/notifications/unread-count', { cookie });
+    return data.count;
+  } catch {
+    return 0;
+  }
+}
+
+export async function listNotifications(
+  cookie?: string | null,
+  page: { limit?: number; offset?: number; unreadOnly?: boolean } = {},
+) {
+  const qs = new URLSearchParams();
+  if (page.limit != null) qs.set('limit', String(page.limit));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  if (page.unreadOnly) qs.set('sort', 'unread');
+  const q = qs.toString();
+  return request<{
+    notifications: Array<{
+      id: number;
+      kind: string;
+      body: string;
+      is_read: boolean;
+      created_at: string;
+      thread_id?: number | null;
+      post_id?: number | null;
+      category_id?: number | null;
+      category_slug?: string | null;
+      thread_slug?: string | null;
+      thread_title?: string | null;
+    }>;
+    total: number;
+    unread: number;
+  }>(`/notifications${q ? `?${q}` : ''}`, { cookie });
 }
 
 export async function getThread(categorySlug: string, threadSlug: string, cookie?: string | null) {

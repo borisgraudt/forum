@@ -33,14 +33,38 @@ pub fn threads_router() -> Router<AppState> {
 
 async fn list_threads(
     State(state): State<AppState>,
+    OptionalAuthUser(viewer): OptionalAuthUser,
     Path(category_slug): Path<String>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<(StatusCode, Json<ThreadListResponse>)> {
     let category = CategoryService::get_by_slug(&state.db, &category_slug).await?;
     let limit = query.limit();
     let offset = query.offset();
-    let total = ThreadService::count_by_category(&state.db, category.id).await?;
-    let threads = ThreadService::list_by_category(&state.db, category.id, limit, offset).await?;
+    let sort = query.sort();
+    let total = ThreadService::count_by_category_sorted(&state.db, category.id, sort).await?;
+    let mut threads =
+        ThreadService::list_by_category(&state.db, category.id, limit, offset, sort).await?;
+
+    // Batch-annotate watching/unread (one query each — no N+1).
+    if let Some(u) = viewer {
+        use crate::services::EngagementService;
+        let ids: Vec<i64> = threads.iter().map(|t| t.id).collect();
+        let watching = EngagementService::watching_set(&state.db, u.id, "thread", &ids).await?;
+        let reads = EngagementService::read_cursors(&state.db, u.id, &ids).await?;
+        for t in &mut threads {
+            let is_w = watching.contains(&t.id);
+            t.viewer_watching = Some(is_w);
+            if is_w {
+                let unread = match (t.last_post_at.as_deref(), reads.get(&t.id)) {
+                    (Some(last), Some(read_at)) => last > read_at.as_str(),
+                    (Some(_), None) => true,
+                    _ => false,
+                };
+                t.is_unread = Some(unread);
+            }
+        }
+    }
+
     Ok((
         StatusCode::OK,
         Json(ThreadListResponse {
@@ -61,9 +85,16 @@ async fn get_thread(
     let thread =
         ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
     ThreadService::increment_views(&state.db, thread.id).await?;
-    let thread =
+    let mut thread =
         ThreadService::get_by_category_and_slug(&state.db, category.id, &thread_slug).await?;
-    let viewer_me_too = if let Some(u) = viewer {
+    let viewer_me_too = if let Some(ref u) = viewer {
+        // Mark read — keeps unreads accurate without extra round-trip.
+        let _ =
+            crate::services::EngagementService::mark_thread_read(&state.db, u.id, thread.id).await;
+        let watching =
+            crate::services::EngagementService::is_watching(&state.db, u.id, "thread", thread.id)
+                .await?;
+        thread.viewer_watching = Some(watching);
         ThreadService::viewer_me_too(&state.db, thread.id, u.id).await?
     } else {
         false
@@ -123,12 +154,17 @@ async fn create_thread(
         }
     }
 
+    // Auto-watch own thread so OP gets reply alerts (off hot path).
     let db = state.db.clone();
     let body_for_embed = body_text.clone();
+    let thread_id = thread.id;
+    let author_id = user.id;
     tokio::spawn(async move {
         for url in crate::services::EmbedService::extract_urls(&body_for_embed, 3) {
             let _ = crate::services::EmbedService::get_or_fetch(&db, &url).await;
         }
+        let _ =
+            crate::services::EngagementService::watch(&db, author_id, "thread", thread_id).await;
     });
 
     Ok((

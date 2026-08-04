@@ -1,0 +1,128 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CsrfInput from '../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  formatWhen,
+  getCookieHeader,
+  getMe,
+  listNotifications,
+} from '../lib/api';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+if (!user) return Astro.redirect('/login');
+
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
+
+let items: Awaited<ReturnType<typeof listNotifications>>['notifications'] = [];
+let unread = 0;
+let error: string | null = null;
+try {
+  const data = await listNotifications(cookie, { limit: 50 });
+  items = data.notifications;
+  unread = data.unread;
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Could not load';
+}
+
+function hrefFor(n: (typeof items)[number]) {
+  if (n.category_slug && n.thread_slug) {
+    const base = `/categories/${n.category_slug}/threads/${n.thread_slug}`;
+    return n.post_id ? `${base}#post-${n.post_id}` : base;
+  }
+  if (n.category_slug) return `/categories/${n.category_slug}`;
+  return '/notifications';
+}
+---
+
+<BaseLayout title="Notifications" user={user}>
+  <div class="settings-page">
+    <h1 class="settings-page__title">Notifications</h1>
+    <p class="settings-page__lead">
+      {unread > 0 ? `${unread} unread` : 'You are all caught up.'}
+    </p>
+    {
+      unread > 0 && (
+        <form method="POST" action="/api/notifications/read" class="ask-actions">
+          <CsrfInput token={csrf.token} />
+          <button class="btn btn-secondary btn-sm" type="submit">
+            Mark all read
+          </button>
+        </form>
+      )
+    }
+    {error && <div class="alert">{error}</div>}
+    {
+      items.length === 0 ? (
+        <p class="ad-empty">No notifications yet. Watch a thread to get replies here.</p>
+      ) : (
+        <ul class="notif-list">
+          {items.map((n) => {
+            const href = hrefFor(n);
+            const label = n.body || n.kind;
+            const meta = [n.thread_title, formatWhen(n.created_at)].filter(Boolean).join(' · ');
+            return (
+              <li class:list={['notif-list__item', { 'notif-list__item--unread': !n.is_read }]}>
+                <form method="POST" action="/api/notifications/go" class="notif-list__form">
+                  <CsrfInput token={csrf.token} />
+                  <input type="hidden" name="id" value={String(n.id)} />
+                  <input type="hidden" name="to" value={href} />
+                  <button type="submit" class="notif-list__btn">
+                    <span class="notif-list__body">{label}</span>
+                    <span class="notif-list__meta">{meta}</span>
+                  </button>
+                </form>
+              </li>
+            );
+          })}
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .notif-list {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--border-soft, #e5e5ea);
+  }
+  .notif-list__item {
+    border-bottom: 1px solid var(--border-soft, #e5e5ea);
+  }
+  .notif-list__item--unread .notif-list__body {
+    font-weight: 600;
+  }
+  .notif-list__form {
+    margin: 0;
+  }
+  .notif-list__btn {
+    appearance: none;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 14px 4px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font: inherit;
+    color: inherit;
+  }
+  .notif-list__btn:hover {
+    background: var(--bg-soft, #f5f5f7);
+  }
+  .notif-list__body {
+    font-size: 15px;
+    line-height: 1.35;
+  }
+  .notif-list__meta {
+    font-size: 12px;
+    color: var(--text-tertiary, #8e8e93);
+  }
+</style>

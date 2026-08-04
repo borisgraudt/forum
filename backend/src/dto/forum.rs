@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::models::{
-    AttachmentJson, AuditEntry, Category, Draft, PostEdit, PostViewJson, Report, ReportView,
-    ThreadView, UserProfile, UserPublic, UserSanction, UserSanctionView,
+    AttachmentJson, AuditEntry, Category, Draft, NotificationView, PostEdit, PostViewJson, Report,
+    ReportView, ThreadView, UserProfile, UserPublic, UserSanction, UserSanctionView,
 };
 use crate::services::embed::LinkEmbed;
 
@@ -101,6 +101,8 @@ pub struct UpsertDraftRequest {
 pub struct ListQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// activity | newest | unanswered | solved
+    pub sort: Option<String>,
 }
 
 impl ListQuery {
@@ -110,6 +112,10 @@ impl ListQuery {
 
     pub fn offset(&self) -> i64 {
         self.offset.unwrap_or(0).max(0)
+    }
+
+    pub fn sort(&self) -> &str {
+        self.sort.as_deref().unwrap_or("activity")
     }
 }
 
@@ -138,6 +144,8 @@ pub struct CategoryResponse {
     pub children: Option<Vec<Category>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<Category>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewer_watching: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -239,6 +247,53 @@ pub struct AttachmentResponse {
 #[derive(Debug, Serialize)]
 pub struct EmbedResponse {
     pub embed: LinkEmbed,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct WatchRequest {
+    #[validate(length(min = 1, max = 16))]
+    pub target_type: String,
+    pub target_id: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WatchStatusResponse {
+    pub watching: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SolveThreadRequest {
+    pub is_solved: bool,
+    pub accepted_post_id: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NotificationListResponse {
+    pub notifications: Vec<NotificationView>,
+    pub total: i64,
+    pub unread: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MarkReadRequest {
+    /// Empty / omitted = mark all.
+    pub ids: Option<Vec<i64>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UnreadCountResponse {
+    pub count: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ThreadPulseResponse {
+    pub post_count: i64,
+    pub me_too_count: i64,
+    pub view_count: i64,
+    pub is_solved: bool,
+    pub last_post_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
