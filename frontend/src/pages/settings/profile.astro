@@ -9,8 +9,14 @@ import {
   getUserProfile,
   mediaUrl,
 } from '../../lib/api';
+import { readCookie, resolveLocale, t } from '../../lib/i18n';
 
 const cookie = getCookieHeader(Astro.request);
+const locale = resolveLocale(
+  cookie,
+  Astro.request.headers.get('accept-language'),
+  Astro.url.searchParams.get('lang'),
+);
 const user = await getMe(cookie);
 if (!user) {
   return Astro.redirect('/login');
@@ -29,117 +35,194 @@ try {
 
 const error = Astro.url.searchParams.get('error');
 const saved = Astro.url.searchParams.get('saved');
+const prefsSaved = Astro.url.searchParams.get('prefs') === '1';
+const themePref = readCookie(cookie, 'theme') || 'system';
+const langPref = locale;
 ---
 
-<BaseLayout title="Edit profile" user={user} active={null}>
+<BaseLayout title={t(locale, 'settings')} user={user} active={null}>
   <div class="settings-page">
-    <h1 class="settings-page__title">Edit profile</h1>
-    <p class="settings-page__lead">
-      Display name, bio, and avatar. Keep images small — we resize server-side.
-    </p>
+    <h1 class="settings-page__title">{t(locale, 'settings')}</h1>
+    <p class="settings-page__lead">{t(locale, 'editProfileLead')}</p>
 
     {error && <div class="alert">{error}</div>}
-    {saved && <div class="alert alert--ok">Profile saved.</div>}
+    {saved && <div class="alert alert--ok">{t(locale, 'profileSaved')}</div>}
+    {prefsSaved && <div class="alert alert--ok">{t(locale, 'prefsSaved')}</div>}
 
-    <div class="settings-avatar">
-      <div class="settings-avatar__preview" aria-hidden="true">
-        {
-          user.avatar_url ? (
-            <img src={mediaUrl(user.avatar_url)!} alt="" width="72" height="72" />
-          ) : (
-            <span>{(user.display_name || user.username).slice(0, 1).toUpperCase()}</span>
-          )
-        }
-      </div>
-      <form id="avatar-form" class="settings-avatar__form" enctype="multipart/form-data">
-        <CsrfInput token={csrf.token} />
-        <label class="btn btn-secondary btn-sm">
-          Upload avatar
-          <input
-            type="file"
-            name="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            hidden
-            id="avatar-input"
-          />
-        </label>
-        <p class="ask-hint">JPEG/PNG/GIF/WebP · max 2&nbsp;MB · square crop</p>
+    <section class="settings-section" aria-labelledby="appearance-title">
+      <h2 id="appearance-title" class="settings-section__title">{t(locale, 'appearance')}</h2>
+      <p class="settings-section__lead">{t(locale, 'appearanceLead')}</p>
+
+      <form class="settings-form settings-form--prefs" id="prefs-form">
+        <div class="ask-field">
+          <span class="settings-label" id="lang-label">{t(locale, 'language')}</span>
+          <div class="settings-radios" role="radiogroup" aria-labelledby="lang-label">
+            <label class="settings-radio">
+              <input type="radio" name="lang" value="en" checked={langPref === 'en'} />
+              English
+            </label>
+            <label class="settings-radio">
+              <input type="radio" name="lang" value="ru" checked={langPref === 'ru'} />
+              Русский
+            </label>
+          </div>
+        </div>
+
+        <div class="ask-field">
+          <span class="settings-label" id="theme-label">{t(locale, 'theme')}</span>
+          <div class="settings-radios" role="radiogroup" aria-labelledby="theme-label">
+            <label class="settings-radio">
+              <input type="radio" name="theme" value="system" checked={themePref === 'system'} />
+              {t(locale, 'themeSystem')}
+            </label>
+            <label class="settings-radio">
+              <input type="radio" name="theme" value="light" checked={themePref === 'light'} />
+              {t(locale, 'themeLight')}
+            </label>
+            <label class="settings-radio">
+              <input type="radio" name="theme" value="dark" checked={themePref === 'dark'} />
+              {t(locale, 'themeDark')}
+            </label>
+          </div>
+        </div>
+
+        <div class="ask-actions">
+          <button class="btn btn-primary" type="submit">{t(locale, 'savePrefs')}</button>
+        </div>
       </form>
-    </div>
-    <script is:inline>
-      (function () {
-        var input = document.getElementById('avatar-input');
-        var form = document.getElementById('avatar-form');
-        var csrfEl = form && form.querySelector('input[name="csrf_token"]');
-        var csrf = (csrfEl && csrfEl.value) || '';
-        if (!input) return;
-        input.addEventListener('change', async function () {
-          var file = input.files && input.files[0];
-          if (!file) return;
-          var fd = new FormData();
-          fd.append('file', file);
-          var res = await fetch('/api/upload?kind=avatar', {
-            method: 'POST',
-            headers: csrf ? { 'X-CSRF-Token': csrf } : {},
-            body: fd,
-            credentials: 'include',
-          });
-          if (res.ok) location.reload();
-          else {
-            var data = await res.json().catch(function () {
-              return {};
-            });
-            alert(data.error || 'Upload failed');
+    </section>
+
+    <hr class="settings-divider" />
+
+    <section class="settings-section" aria-labelledby="profile-title">
+      <h2 id="profile-title" class="settings-section__title">{t(locale, 'editProfile')}</h2>
+
+      <div class="settings-avatar">
+        <div class="settings-avatar__preview" aria-hidden="true">
+          {
+            user.avatar_url ? (
+              <img src={mediaUrl(user.avatar_url)!} alt="" width="72" height="72" />
+            ) : (
+              <span>{(user.display_name || user.username).slice(0, 1).toUpperCase()}</span>
+            )
           }
-        });
-      })();
-    </script>
-
-    <form method="POST" action="/api/profile" class="settings-form">
-      <CsrfInput token={csrf.token} />
-
-      <div class="ask-field">
-        <label for="username">Username</label>
-        <input
-          id="username"
-          type="text"
-          class="ask-input"
-          value={user.username}
-          disabled
-          aria-describedby="username-hint"
-        />
-        <p id="username-hint" class="ask-hint">Username cannot be changed yet.</p>
+        </div>
+        <form id="avatar-form" class="settings-avatar__form" enctype="multipart/form-data">
+          <CsrfInput token={csrf.token} />
+          <label class="btn btn-secondary btn-sm">
+            {t(locale, 'uploadAvatar')}
+            <input
+              type="file"
+              name="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              hidden
+              id="avatar-input"
+            />
+          </label>
+          <p class="ask-hint">{t(locale, 'avatarHint')}</p>
+        </form>
       </div>
+      <script is:inline>
+        (function () {
+          var input = document.getElementById('avatar-input');
+          var form = document.getElementById('avatar-form');
+          var csrfEl = form && form.querySelector('input[name="csrf_token"]');
+          var csrf = (csrfEl && csrfEl.value) || '';
+          if (!input) return;
+          input.addEventListener('change', async function () {
+            var file = input.files && input.files[0];
+            if (!file) return;
+            var fd = new FormData();
+            fd.append('file', file);
+            var res = await fetch('/api/upload?kind=avatar', {
+              method: 'POST',
+              headers: csrf ? { 'X-CSRF-Token': csrf } : {},
+              body: fd,
+              credentials: 'include',
+            });
+            if (res.ok) location.reload();
+            else {
+              var data = await res.json().catch(function () {
+                return {};
+              });
+              alert(data.error || 'Upload failed');
+            }
+          });
+        })();
+      </script>
 
-      <div class="ask-field">
-        <label for="display_name">Display name</label>
-        <input
-          id="display_name"
-          name="display_name"
-          type="text"
-          class="ask-input"
-          maxlength="64"
-          value={user.display_name || ''}
-          placeholder="How you appear on posts"
-        />
-      </div>
+      <form method="POST" action="/api/profile" class="settings-form">
+        <CsrfInput token={csrf.token} />
 
-      <div class="ask-field">
-        <label for="bio">Bio</label>
-        <textarea
-          id="bio"
-          name="bio"
-          class="ask-input settings-form__bio"
-          maxlength="500"
-          rows="4"
-          placeholder="A short public bio (optional)">{bio}</textarea
-        >
-      </div>
+        <div class="ask-field">
+          <label for="username">{t(locale, 'username')}</label>
+          <input
+            id="username"
+            type="text"
+            class="ask-input"
+            value={user.username}
+            disabled
+            aria-describedby="username-hint"
+          />
+          <p id="username-hint" class="ask-hint">{t(locale, 'usernameHint')}</p>
+        </div>
 
-      <div class="ask-actions">
-        <button class="btn btn-primary" type="submit">Save</button>
-        <a class="btn btn-secondary" href={`/u/${user.username}`}> View profile </a>
-      </div>
-    </form>
+        <div class="ask-field">
+          <label for="display_name">{t(locale, 'displayName')}</label>
+          <input
+            id="display_name"
+            name="display_name"
+            type="text"
+            class="ask-input"
+            maxlength="64"
+            value={user.display_name || ''}
+            placeholder={t(locale, 'displayNamePlaceholder')}
+          />
+        </div>
+
+        <div class="ask-field">
+          <label for="bio">{t(locale, 'bio')}</label>
+          <textarea
+            id="bio"
+            name="bio"
+            class="ask-input settings-form__bio"
+            maxlength="500"
+            rows="4"
+            placeholder={t(locale, 'bioPlaceholder')}>{bio}</textarea
+          >
+        </div>
+
+        <div class="ask-actions">
+          <button class="btn btn-primary" type="submit">{t(locale, 'save')}</button>
+          <a class="btn btn-secondary" href={`/u/${user.username}`}>{t(locale, 'viewProfile')}</a>
+        </div>
+      </form>
+    </section>
   </div>
+
+  <script is:inline>
+    (function () {
+      var form = document.getElementById('prefs-form');
+      if (!form) return;
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var fd = new FormData(form);
+        var lang = String(fd.get('lang') || 'en');
+        var theme = String(fd.get('theme') || 'system');
+        document.cookie =
+          'lang=' + encodeURIComponent(lang) + '; Path=/; Max-Age=31536000; SameSite=Lax';
+        document.cookie =
+          'theme=' + encodeURIComponent(theme) + '; Path=/; Max-Age=31536000; SameSite=Lax';
+        if (theme === 'dark' || theme === 'light') {
+          document.documentElement.setAttribute('data-theme', theme);
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        var url = new URL(location.href);
+        url.searchParams.set('prefs', '1');
+        url.searchParams.delete('lang');
+        location.href = url.pathname + '?' + url.searchParams.toString();
+      });
+    })();
+  </script>
 </BaseLayout>

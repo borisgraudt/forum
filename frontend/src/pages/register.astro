@@ -2,8 +2,14 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CsrfInput from '../components/CsrfInput.astro';
 import { applySetCookies, ensureCsrf, getCookieHeader, getMe } from '../lib/api';
+import { resolveLocale, t } from '../lib/i18n';
 
 const cookie = getCookieHeader(Astro.request);
+const locale = resolveLocale(
+  cookie,
+  Astro.request.headers.get('accept-language'),
+  Astro.url.searchParams.get('lang'),
+);
 const user = await getMe(cookie);
 if (user) return Astro.redirect('/');
 
@@ -12,15 +18,15 @@ const csrf = await ensureCsrf(cookie);
 applySetCookies(Astro.response, csrf.setCookies);
 ---
 
-<BaseLayout title="Join" user={null}>
+<BaseLayout title={t(locale, 'joinTitle')} user={null}>
   <div class="auth-card">
-    <h1>Join</h1>
-    <p class="lead">Create an account to ask and answer.</p>
+    <h1>{t(locale, 'joinTitle')}</h1>
+    <p class="lead">{t(locale, 'joinLead')}</p>
     <form method="POST" action="/api/register">
       <CsrfInput token={csrf.token} />
       {error && <div class="alert">{error}</div>}
       <div class="field">
-        <label for="username">Username</label>
+        <label for="username">{t(locale, 'username')}</label>
         <input
           id="username"
           name="username"
@@ -31,20 +37,20 @@ applySetCookies(Astro.response, csrf.setCookies);
         />
       </div>
       <div class="field">
-        <label for="email">Email</label>
+        <label for="email">{t(locale, 'email')}</label>
         <input id="email" name="email" type="email" required />
       </div>
       <div class="field">
-        <label for="display_name">Display name (optional)</label>
+        <label for="display_name">{t(locale, 'displayNameOptional')}</label>
         <input id="display_name" name="display_name" maxlength="64" />
       </div>
       <div class="field">
-        <label for="password">Password</label>
+        <label for="password">{t(locale, 'password')}</label>
         <input id="password" name="password" type="password" required minlength="8" />
       </div>
       <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Join</button>
-        <span class="muted"><a href="/login">Sign in</a></span>
+        <button class="btn btn-primary" type="submit">{t(locale, 'join')}</button>
+        <span class="muted"><a href="/login">{t(locale, 'signIn')}</a></span>
       </div>
     </form>
   </div>

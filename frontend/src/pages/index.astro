@@ -1,9 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCookieHeader, getMe, isAdmin, listChildren, listRootCategories } from '../lib/api';
+import { resolveLocale, t } from '../lib/i18n';
 import type { Category } from '../lib/types';
 
 const cookie = getCookieHeader(Astro.request);
+const locale = resolveLocale(
+  cookie,
+  Astro.request.headers.get('accept-language'),
+  Astro.url.searchParams.get('lang'),
+);
 
 type CommunityRow = {
   root: Category;
@@ -29,35 +35,37 @@ try {
     }),
   );
 } catch (e) {
-  error = e instanceof Error ? e.message : 'Could not load communities';
+  error = e instanceof Error ? e.message : t(locale, 'couldNotLoad');
   if (!user) user = await getMe(cookie).catch(() => null);
 }
 ---
 
-<BaseLayout title="Browse Communities" user={user} active="browse">
+<BaseLayout title={t(locale, 'browseTitle')} user={user} active="browse">
   <div class="browse-hero">
-    <h1>Browse Communities</h1>
+    <h1>{t(locale, 'browseTitle')}</h1>
   </div>
 
   {
     error ? (
-      <div class="alert">{error}. Start the API on port 3000.</div>
+      <div class="alert">
+        {error}. {t(locale, 'startApi')}
+      </div>
     ) : rows.length === 0 ? (
       <div class="empty">
-        <p>No communities yet.</p>
+        <p>{t(locale, 'noCommunities')}</p>
         {isAdmin(user) ? (
           <p style="margin-top:12px">
             <a class="btn btn-primary" href="/categories/new">
-              Create a community
+              {t(locale, 'createCommunity')}
             </a>
           </p>
         ) : user ? (
           <p style="margin-top:12px" class="muted">
-            An admin will set up the first community.
+            {t(locale, 'adminWillSetup')}
           </p>
         ) : (
           <p style="margin-top:12px">
-            <a href="/login">Sign in</a> — communities are managed by admins.
+            <a href="/login">{t(locale, 'signIn')}</a> — {t(locale, 'signInToSee')}
           </p>
         )}
       </div>
@@ -66,7 +74,7 @@ try {
         <div class="toolbar-row">
           {isAdmin(user) && (
             <a class="btn btn-secondary btn-sm" href="/categories/new">
-              New community
+              {t(locale, 'newCommunity')}
             </a>
           )}
         </div>
@@ -91,11 +99,11 @@ try {
                 </ul>
               ) : (
                 <p class="cat-list__empty">
-                  No subcategories
+                  {t(locale, 'noSubcategories')}
                   {isAdmin(user) && (
                     <>
                       {' '}
-                      · <a href={`/categories/new?parent=${root.slug}`}>add</a>
+                      · <a href={`/categories/new?parent=${root.slug}`}>{t(locale, 'add')}</a>
                     </>
                   )}
                 </p>

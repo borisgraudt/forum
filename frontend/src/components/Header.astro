@@ -14,11 +14,6 @@ const { user = null, active = null, unreadCount = 0, locale = 'en' } = Astro.pro
 const display = user ? user.display_name || user.username : '';
 const isAdmin = user?.role === 'admin';
 const isStaff = user?.role === 'moderator' || user?.role === 'admin';
-const path = Astro.url.pathname;
-const qs = new URLSearchParams(Astro.url.search);
-qs.delete('lang');
-const baseQs = qs.toString();
-const langHref = (lang: string) => `${path}?${baseQs ? `${baseQs}&` : ''}lang=${lang}`;
 ---
 
 <header class="site-header">
@@ -29,9 +24,9 @@ const langHref = (lang: string) => `${path}?${baseQs ? `${baseQs}&` : ''}lang=${
       <nav class="nav-links" aria-label="Primary">
         <a href="/ask" class:list={[{ 'is-active': active === 'ask' }]}>{t(locale, 'ask')}</a>
         <a href="/" class:list={[{ 'is-active': active === 'browse' }]}>{t(locale, 'browse')}</a>
-        <a href="/search" class:list={[{ 'is-active': active === 'search' }]}
-          >{t(locale, 'search')}</a
-        >
+        <a href="/search" class:list={[{ 'is-active': active === 'search' }]}>
+          {t(locale, 'search')}
+        </a>
         {
           user && (
             <a href="/notifications" class="nav-notif">
@@ -46,29 +41,13 @@ const langHref = (lang: string) => `${path}?${baseQs ? `${baseQs}&` : ''}lang=${
         }
       </nav>
 
-      <nav class="lang-switch" aria-label="Language">
-        <a href={langHref('en')} class:list={[{ 'is-active': locale === 'en' }]} hreflang="en">
-          EN
-        </a>
-        <a href={langHref('ru')} class:list={[{ 'is-active': locale === 'ru' }]} hreflang="ru">
-          RU
-        </a>
-      </nav>
-
-      <button
-        type="button"
-        class="theme-toggle"
-        id="theme-toggle"
-        aria-label={t(locale, 'theme')}
-        title={t(locale, 'theme')}
-      >
-        ◐
-      </button>
-
       {
         user ? (
           <details class="profile-menu">
-            <summary class="profile-menu__trigger" aria-label={`Account: ${display}`}>
+            <summary
+              class="profile-menu__trigger"
+              aria-label={`${t(locale, 'profile')}: ${display}`}
+            >
               <span class="profile-btn profile-btn--avatar" aria-hidden="true">
                 <Avatar name={display} src={user.avatar_url} size={32} />
               </span>
@@ -132,34 +111,10 @@ const langHref = (lang: string) => `${path}?${baseQs ? `${baseQs}&` : ''}lang=${
 
 <script>
   document.addEventListener('click', (e) => {
-    const t = e.target;
-    if (!(t instanceof Node)) return;
-    document.querySelectorAll('details.profile-menu[open]').forEach((el) => {
-      if (!el.contains(t)) el.removeAttribute('open');
+    const el = e.target;
+    if (!(el instanceof Node)) return;
+    document.querySelectorAll('details.profile-menu[open]').forEach((d) => {
+      if (!d.contains(el)) d.removeAttribute('open');
     });
   });
-
-  (function themeToggle() {
-    const btn = document.getElementById('theme-toggle');
-    if (!btn) return;
-    function current() {
-      return document.documentElement.getAttribute('data-theme') || 'system';
-    }
-    function setTheme(next: string) {
-      if (next === 'system') {
-        document.documentElement.removeAttribute('data-theme');
-        document.cookie = 'theme=system; Path=/; Max-Age=31536000; SameSite=Lax';
-      } else {
-        document.documentElement.setAttribute('data-theme', next);
-        document.cookie = 'theme=' + next + '; Path=/; Max-Age=31536000; SameSite=Lax';
-      }
-    }
-    btn.addEventListener('click', () => {
-      const cur = current();
-      // light → dark → system → light
-      if (cur === 'light') setTheme('dark');
-      else if (cur === 'dark') setTheme('system');
-      else setTheme('light');
-    });
-  })();
 </script>

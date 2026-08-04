@@ -18,6 +18,7 @@ const since = (Astro.url.searchParams.get('since') || '').trim();
 const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
 const limit = 20;
 const offset = (page - 1) * limit;
+const hasFilters = Boolean(author || category || since);
 
 let results: SearchHit[] = [];
 let total = 0;
@@ -60,32 +61,53 @@ function pageHref(p: number) {
     <p class="page-sub">{t(locale, 'searchLead')}</p>
 
     <form class="search-form" method="GET" action="/search">
-      <input
-        class="ask-input"
-        type="search"
-        name="q"
-        value={q}
-        placeholder={t(locale, 'searchPlaceholder')}
-        required
-        minlength="1"
-        maxlength="200"
-        autofocus
-      />
-      <button class="btn btn-primary" type="submit">{t(locale, 'searchBtn')}</button>
-      <div class="search-filters">
-        <label>
-          {t(locale, 'filterAuthor')}
-          <input type="text" name="author" value={author} maxlength="32" autocomplete="off" />
-        </label>
-        <label>
-          {t(locale, 'filterCategory')}
-          <input type="text" name="category" value={category} maxlength="80" autocomplete="off" />
-        </label>
-        <label>
-          {t(locale, 'filterSince')}
-          <input type="date" name="since" value={since} />
-        </label>
+      <div class="search-form__row">
+        <input
+          class="ask-input"
+          type="search"
+          name="q"
+          value={q}
+          placeholder={t(locale, 'searchPlaceholder')}
+          required
+          minlength="1"
+          maxlength="200"
+          autofocus
+        />
+        <button class="btn btn-primary" type="submit">{t(locale, 'searchBtn')}</button>
       </div>
+
+      <details class="search-filters" open={hasFilters || undefined}>
+        <summary class="search-filters__summary">{t(locale, 'filters')}</summary>
+        <div class="search-filters__grid">
+          <label>
+            <span>{t(locale, 'filterAuthor')}</span>
+            <input
+              type="text"
+              name="author"
+              value={author}
+              maxlength="32"
+              autocomplete="off"
+              class="search-filters__input"
+            />
+          </label>
+          <label>
+            <span>{t(locale, 'filterCategory')}</span>
+            <input
+              type="text"
+              name="category"
+              value={category}
+              maxlength="80"
+              autocomplete="off"
+              class="search-filters__input"
+              placeholder="slug"
+            />
+          </label>
+          <label>
+            <span>{t(locale, 'filterSince')}</span>
+            <input type="date" name="since" value={since} class="search-filters__input" />
+          </label>
+        </div>
+      </details>
     </form>
 
     {error && <div class="alert">{error}</div>}

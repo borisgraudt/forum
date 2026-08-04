@@ -9,8 +9,14 @@ import {
   getMe,
   listNotifications,
 } from '../lib/api';
+import { resolveLocale, t } from '../lib/i18n';
 
 const cookie = getCookieHeader(Astro.request);
+const locale = resolveLocale(
+  cookie,
+  Astro.request.headers.get('accept-language'),
+  Astro.url.searchParams.get('lang'),
+);
 const user = await getMe(cookie);
 if (!user) return Astro.redirect('/login');
 
@@ -25,7 +31,7 @@ try {
   items = data.notifications;
   unread = data.unread;
 } catch (e) {
-  error = e instanceof Error ? e.message : 'Could not load';
+  error = e instanceof Error ? e.message : t(locale, 'couldNotLoad');
 }
 
 function hrefFor(n: (typeof items)[number]) {
@@ -38,18 +44,18 @@ function hrefFor(n: (typeof items)[number]) {
 }
 ---
 
-<BaseLayout title="Notifications" user={user}>
+<BaseLayout title={t(locale, 'notifications')} user={user}>
   <div class="settings-page">
-    <h1 class="settings-page__title">Notifications</h1>
+    <h1 class="settings-page__title">{t(locale, 'notifications')}</h1>
     <p class="settings-page__lead">
-      {unread > 0 ? `${unread} unread` : 'You are all caught up.'}
+      {unread > 0 ? `${unread} ${t(locale, 'unread')}` : t(locale, 'allCaughtUp')}
     </p>
     {
       unread > 0 && (
         <form method="POST" action="/api/notifications/read" class="ask-actions">
           <CsrfInput token={csrf.token} />
           <button class="btn btn-secondary btn-sm" type="submit">
-            Mark all read
+            {t(locale, 'markAllRead')}
           </button>
         </form>
       )
@@ -57,7 +63,7 @@ function hrefFor(n: (typeof items)[number]) {
     {error && <div class="alert">{error}</div>}
     {
       items.length === 0 ? (
-        <p class="ad-empty">No notifications yet. Watch a thread to get replies here.</p>
+        <p class="ad-empty">{t(locale, 'noNotifications')}</p>
       ) : (
         <ul class="notif-list">
           {items.map((n) => {
