@@ -1,8 +1,11 @@
 ---
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Avatar from '../../../../components/Avatar.astro';
 import CsrfInput from '../../../../components/CsrfInput.astro';
+import PostMedia from '../../../../components/PostMedia.astro';
 import {
   ApiRequestError,
+  API_ORIGIN,
   applySetCookies,
   authorLabel,
   ensureCsrf,
@@ -10,7 +13,6 @@ import {
   getCategory,
   getCookieHeader,
   getMe,
-  initials,
   isModerator,
   listDrafts,
   listPostEdits,
@@ -119,7 +121,10 @@ const replyToPost =
   Number.isFinite(replyToId) && replyToId > 0 ? posts.find((p) => p.id === replyToId) : undefined;
 
 function bodyHtml(post: Post) {
-  return post.body_html || post.body;
+  let h = post.body_html || post.body || '';
+  // Markdown images use /media/* on API host — rewrite for browser.
+  h = h.replace(/(src|href)="\/media\//g, `$1="${API_ORIGIN}/media/`);
+  return h;
 }
 
 function replyHref(postId?: number) {
@@ -217,9 +222,13 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
 
         <article class="ad-post ad-post--op" id={`post-${op.id}`}>
           <header class="ad-post__head">
-            <a class="ad-post__avatar" href={authorHref(op.author_username)} aria-hidden="true">
-              {initials(opAuthor)}
-            </a>
+            <Avatar
+              class="ad-post__avatar"
+              name={opAuthor}
+              src={op.author_avatar_url}
+              size={40}
+              href={authorHref(op.author_username)}
+            />
             <div class="ad-post__who">
               <div class="ad-post__name-row">
                 <a class="ad-post__name" href={authorHref(op.author_username)}>
@@ -234,7 +243,10 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
           {op.is_deleted ? (
             <p class="ad-post__deleted">This post was deleted.</p>
           ) : (
-            <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
+            <>
+              <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
+              <PostMedia attachments={op.attachments} embeds={op.embeds} />
+            </>
           )}
           <p class="ad-post__posted">
             Posted on {formatWhen(op.created_at)}
@@ -351,13 +363,13 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
             id={`post-${topReply.id}`}
           >
             <header class="ad-post__head">
-              <a
+              <Avatar
                 class="ad-post__avatar"
+                name={authorLabel(topReply)}
+                src={topReply.author_avatar_url}
+                size={40}
                 href={authorHref(topReply.author_username)}
-                aria-hidden="true"
-              >
-                {initials(authorLabel(topReply))}
-              </a>
+              />
               <div class="ad-post__who">
                 <div class="ad-post__name-row">
                   <a class="ad-post__name" href={authorHref(topReply.author_username)}>
@@ -420,7 +432,10 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
             ) : topReply.is_deleted ? (
               <p class="ad-post__deleted">This reply was deleted.</p>
             ) : (
-              <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
+              <>
+                <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
+                <PostMedia attachments={topReply.attachments} embeds={topReply.embeds} />
+              </>
             )}
 
             {!topReply.is_deleted && editId !== topReply.id && (
@@ -514,13 +529,13 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 id={`post-${post.id}`}
               >
                 <header class="ad-post__head">
-                  <a
+                  <Avatar
                     class="ad-post__avatar"
+                    name={who}
+                    src={post.author_avatar_url}
+                    size={40}
                     href={authorHref(post.author_username)}
-                    aria-hidden="true"
-                  >
-                    {initials(who)}
-                  </a>
+                  />
                   <div class="ad-post__who">
                     <div class="ad-post__name-row">
                       <a class="ad-post__name" href={authorHref(post.author_username)}>
@@ -595,7 +610,10 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 ) : post.is_deleted ? (
                   <p class="ad-post__deleted">This reply was deleted.</p>
                 ) : (
-                  <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
+                  <>
+                    <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
+                    <PostMedia attachments={post.attachments} embeds={post.embeds} />
+                  </>
                 )}
 
                 {!post.is_deleted && editId !== post.id && (
@@ -703,6 +721,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
               method="POST"
               action={`/api/categories/${category.slug}/threads/${thread.slug}/posts`}
               id="reply-form"
+              data-composer
             >
               <CsrfInput token={csrfToken} />
               {replyDraft && <input type="hidden" name="draft_id" value={String(replyDraft.id)} />}
@@ -710,24 +729,22 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 <input type="hidden" name="reply_to_post_id" value={String(replyToPost.id)} />
               )}
               <div class="ad-reply__box">
-                <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
-                  {initials(user.display_name || user.username)}
-                </div>
+                <Avatar
+                  class="ad-post__avatar ad-reply__avatar"
+                  name={user.display_name || user.username}
+                  src={user.avatar_url}
+                  size={40}
+                />
                 <div class="ad-reply__editor-wrap">
                   <div class="ask-editor ad-reply__editor">
                     <textarea
                       name="body"
                       required
                       maxlength="50000"
-                      placeholder="Write a reply… Markdown supported."
+                      placeholder="Write a reply… Markdown, @mentions, paste images."
                     >
                       {replyDraft?.body || ''}
                     </textarea>
-                    <div class="ask-toolbar" aria-hidden="true">
-                      <span>B</span>
-                      <span>I</span>
-                      <span>U</span>
-                    </div>
                   </div>
                   <div class="ad-reply__actions">
                     <button class="btn btn-primary" type="submit">

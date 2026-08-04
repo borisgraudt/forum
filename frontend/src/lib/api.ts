@@ -17,6 +17,15 @@ import type {
 // Prefer 127.0.0.1 over localhost: Node's fetch resolves localhost to ::1 first,
 // and the API often only listens on IPv4 — each SSR hop paid ~10ms+ of delay.
 const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
+/** API origin without /api/v1 — for /media/* immutable assets. */
+export const API_ORIGIN = API_BASE.replace(/\/api\/v1\/?$/, '');
+
+/** Resolve relative /media/... paths against the API host (cache-friendly CDN path). */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return `${API_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+}
 
 export class ApiRequestError extends Error {
   status: number;

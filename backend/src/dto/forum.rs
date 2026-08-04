@@ -2,9 +2,10 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::models::{
-    AuditEntry, Category, Draft, PostEdit, PostViewJson, Report, ReportView, ThreadView,
-    UserProfile, UserPublic, UserSanction, UserSanctionView,
+    AttachmentJson, AuditEntry, Category, Draft, PostEdit, PostViewJson, Report, ReportView,
+    ThreadView, UserProfile, UserPublic, UserSanction, UserSanctionView,
 };
+use crate::services::embed::LinkEmbed;
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateCategoryRequest {
@@ -33,6 +34,8 @@ pub struct CreateThreadRequest {
 
     #[validate(length(min = 1, max = 50_000, message = "body must be 1-50000 characters"))]
     pub body: String,
+
+    pub attachment_ids: Option<Vec<i64>>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -40,6 +43,8 @@ pub struct CreatePostRequest {
     #[validate(length(min = 1, max = 50_000, message = "body must be 1-50000 characters"))]
     pub body: String,
     pub reply_to_post_id: Option<i64>,
+    /// Attachment ids previously uploaded by this user.
+    pub attachment_ids: Option<Vec<i64>>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -224,6 +229,36 @@ pub struct DraftResponse {
 #[derive(Debug, Serialize)]
 pub struct PostEditListResponse {
     pub edits: Vec<PostEdit>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AttachmentResponse {
+    pub attachment: AttachmentJson,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EmbedResponse {
+    pub embed: LinkEmbed,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct PasswordResetRequest {
+    #[validate(length(min = 3, max = 254))]
+    pub login: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct PasswordResetConfirm {
+    #[validate(length(min = 16, max = 128))]
+    pub token: String,
+    #[validate(length(min = 8, max = 128))]
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct EmailVerifyConfirm {
+    #[validate(length(min = 16, max = 128))]
+    pub token: String,
 }
 
 // ── v0.4 moderation ─────────────────────────────────────────────────────────

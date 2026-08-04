@@ -1,7 +1,14 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import CsrfInput from '../../components/CsrfInput.astro';
-import { applySetCookies, ensureCsrf, getCookieHeader, getMe, getUserProfile } from '../../lib/api';
+import {
+  applySetCookies,
+  ensureCsrf,
+  getCookieHeader,
+  getMe,
+  getUserProfile,
+  mediaUrl,
+} from '../../lib/api';
 
 const cookie = getCookieHeader(Astro.request);
 const user = await getMe(cookie);
@@ -28,11 +35,65 @@ const saved = Astro.url.searchParams.get('saved');
   <div class="settings-page">
     <h1 class="settings-page__title">Edit profile</h1>
     <p class="settings-page__lead">
-      Public display name and short bio. Avatars arrive in a later release.
+      Display name, bio, and avatar. Keep images small — we resize server-side.
     </p>
 
     {error && <div class="alert">{error}</div>}
     {saved && <div class="alert alert--ok">Profile saved.</div>}
+
+    <div class="settings-avatar">
+      <div class="settings-avatar__preview" aria-hidden="true">
+        {
+          user.avatar_url ? (
+            <img src={mediaUrl(user.avatar_url)!} alt="" width="72" height="72" />
+          ) : (
+            <span>{(user.display_name || user.username).slice(0, 1).toUpperCase()}</span>
+          )
+        }
+      </div>
+      <form id="avatar-form" class="settings-avatar__form" enctype="multipart/form-data">
+        <CsrfInput token={csrf.token} />
+        <label class="btn btn-secondary btn-sm">
+          Upload avatar
+          <input
+            type="file"
+            name="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            hidden
+            id="avatar-input"
+          />
+        </label>
+        <p class="ask-hint">JPEG/PNG/GIF/WebP · max 2&nbsp;MB · square crop</p>
+      </form>
+    </div>
+    <script is:inline>
+      (function () {
+        var input = document.getElementById('avatar-input');
+        var form = document.getElementById('avatar-form');
+        var csrfEl = form && form.querySelector('input[name="csrf_token"]');
+        var csrf = (csrfEl && csrfEl.value) || '';
+        if (!input) return;
+        input.addEventListener('change', async function () {
+          var file = input.files && input.files[0];
+          if (!file) return;
+          var fd = new FormData();
+          fd.append('file', file);
+          var res = await fetch('/api/upload?kind=avatar', {
+            method: 'POST',
+            headers: csrf ? { 'X-CSRF-Token': csrf } : {},
+            body: fd,
+            credentials: 'include',
+          });
+          if (res.ok) location.reload();
+          else {
+            var data = await res.json().catch(function () {
+              return {};
+            });
+            alert(data.error || 'Upload failed');
+          }
+        });
+      })();
+    </script>
 
     <form method="POST" action="/api/profile" class="settings-form">
       <CsrfInput token={csrf.token} />

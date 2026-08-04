@@ -86,7 +86,7 @@ const bodyValue = draft?.body || '';
       )
     }
 
-    <form method="POST" action="/api/ask" id="ask-form">
+    <form method="POST" action="/api/ask" id="ask-form" data-composer>
       <CsrfInput token={csrf.token} />
       {draft && <input type="hidden" name="draft_id" value={String(draft.id)} />}
       <div class="ask-field">

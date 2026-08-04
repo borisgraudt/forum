@@ -116,6 +116,21 @@ async fn create_thread(
     )
     .await?;
 
+    if let Some(ids) = body.attachment_ids.as_ref() {
+        if !ids.is_empty() {
+            crate::services::MediaService::link_to_post(&state.db, first_post.id, ids, user.id)
+                .await?;
+        }
+    }
+
+    let db = state.db.clone();
+    let body_for_embed = body_text.clone();
+    tokio::spawn(async move {
+        for url in crate::services::EmbedService::extract_urls(&body_for_embed, 3) {
+            let _ = crate::services::EmbedService::get_or_fetch(&db, &url).await;
+        }
+    });
+
     Ok((
         StatusCode::CREATED,
         Json(ThreadResponse {

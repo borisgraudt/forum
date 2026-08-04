@@ -10,6 +10,11 @@ const THREAD_VIEW_SELECT: &str = r#"
         t.created_at, t.updated_at,
         u.username AS author_username,
         u.display_name AS author_display_name,
+        CASE
+            WHEN u.avatar_key IS NOT NULL AND u.avatar_key != ''
+            THEN '/media/' || u.avatar_key
+            ELSE NULL
+        END AS author_avatar_url,
         (SELECT COUNT(*) FROM thread_me_too m WHERE m.thread_id = t.id) AS me_too_count
     FROM threads t
     INNER JOIN users u ON u.id = t.author_id
@@ -22,6 +27,7 @@ const POST_VIEW_SELECT: &str = r#"
         p.created_at, p.updated_at,
         u.username AS author_username,
         u.display_name AS author_display_name,
+        u.avatar_key AS author_avatar_key,
         (SELECT COUNT(*) FROM post_helpful h WHERE h.post_id = p.id) AS helpful_count
     FROM posts p
     INNER JOIN users u ON u.id = p.author_id

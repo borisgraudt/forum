@@ -11,6 +11,7 @@ const POST_VIEW_SELECT: &str = r#"
         p.created_at, p.updated_at,
         u.username AS author_username,
         u.display_name AS author_display_name,
+        u.avatar_key AS author_avatar_key,
         (SELECT COUNT(*) FROM post_helpful h WHERE h.post_id = p.id) AS helpful_count
     FROM posts p
     INNER JOIN users u ON u.id = p.author_id

@@ -1,5 +1,6 @@
 use std::env;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
@@ -19,11 +20,14 @@ pub struct Config {
     pub cookie_secure: bool,
     pub cors_origin: String,
     pub rust_log: String,
+    /// Local media root (uploads live under `{data_dir}/uploads`).
+    pub data_dir: PathBuf,
+    /// Public site origin for links in emails (e.g. http://localhost:4321).
+    pub public_origin: String,
 }
 
 impl Config {
     pub fn from_env() -> Result<Self> {
-        // Load .env if present; missing file is fine in CI/production.
         let _ = dotenvy::dotenv();
 
         let host = env::var("HOST").unwrap_or_else(|_| "0.0.0.0".into());
@@ -46,6 +50,10 @@ impl Config {
         let cors_origin =
             env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:4321".into());
         let rust_log = env::var("RUST_LOG").unwrap_or_else(|_| "info,forum_backend=debug".into());
+        let data_dir = env::var("DATA_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("./data"));
+        let public_origin = env::var("PUBLIC_ORIGIN").unwrap_or_else(|_| cors_origin.clone());
 
         if jwt_secret.len() < 16 {
             bail!("JWT_SECRET must be at least 16 characters");
@@ -63,6 +71,8 @@ impl Config {
             cookie_secure,
             cors_origin,
             rust_log,
+            data_dir,
+            public_origin,
         })
     }
 
@@ -88,6 +98,8 @@ mod tests {
             cookie_secure: false,
             cors_origin: "http://localhost:4321".into(),
             rust_log: "info".into(),
+            data_dir: PathBuf::from("./data"),
+            public_origin: "http://localhost:4321".into(),
         };
         assert_eq!(cfg.socket_addr().unwrap().to_string(), "127.0.0.1:3000");
     }

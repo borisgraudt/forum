@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Avatar from '../../../components/Avatar.astro';
 import {
   ApiRequestError,
   authorLabel,
@@ -7,7 +8,6 @@ import {
   getCategory,
   getCookieHeader,
   getMe,
-  initials,
   isAdmin,
   listThreads,
 } from '../../../lib/api';
@@ -153,9 +153,12 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
                           class="topic-list__link"
                           href={`/categories/${category.slug}/threads/${t.slug}`}
                         >
-                          <span class="topic-list__avatar" aria-hidden="true">
-                            {initials(who)}
-                          </span>
+                          <Avatar
+                            class="topic-list__avatar"
+                            name={who}
+                            src={t.author_avatar_url}
+                            size={40}
+                          />
                           <span class="topic-list__main">
                             <span class="topic-list__title">
                               {t.is_pinned && <span class="badge">Pinned</span>}

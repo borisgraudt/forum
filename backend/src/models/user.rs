@@ -59,6 +59,8 @@ pub struct User {
     pub password_hash: String,
     pub display_name: Option<String>,
     pub bio: Option<String>,
+    pub avatar_key: Option<String>,
+    pub email_verified: bool,
     pub role: String,
     pub is_active: bool,
     pub created_at: String,
@@ -70,12 +72,19 @@ impl User {
         UserRole::from_str(&self.role)
     }
 
+    pub fn avatar_url(&self) -> Option<String> {
+        self.avatar_key.as_ref().map(|k| format!("/media/{k}"))
+    }
+
     pub fn into_public(self) -> UserPublic {
+        let avatar_url = self.avatar_url();
         UserPublic {
             id: self.id,
             username: self.username,
             display_name: self.display_name,
             bio: self.bio,
+            avatar_url,
+            email_verified: self.email_verified,
             role: self.role,
             is_active: self.is_active,
             created_at: self.created_at,
@@ -92,6 +101,9 @@ pub struct UserPublic {
     pub display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bio: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar_url: Option<String>,
+    pub email_verified: bool,
     pub role: String,
     pub is_active: bool,
     pub created_at: String,
@@ -154,6 +166,8 @@ mod tests {
             password_hash: "secret-hash".into(),
             display_name: None,
             bio: None,
+            avatar_key: None,
+            email_verified: false,
             role: "user".into(),
             is_active: true,
             created_at: "2026-01-01T00:00:00.000Z".into(),

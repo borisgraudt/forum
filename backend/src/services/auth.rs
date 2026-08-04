@@ -185,6 +185,8 @@ mod tests {
             password_hash: "x".into(),
             display_name: None,
             bio: None,
+            avatar_key: None,
+            email_verified: false,
             role: "user".into(),
             is_active: true,
             created_at: "t".into(),

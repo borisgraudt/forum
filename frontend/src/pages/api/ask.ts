@@ -15,10 +15,18 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     return redirect('/ask?error=' + encodeURIComponent('All fields are required'), 303);
   }
 
+  const attRaw = String(form.get('attachment_ids') || '').trim();
+  const attachment_ids = attRaw
+    ? attRaw
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    : undefined;
+
   const res = await fetch(`${API_BASE}/categories/${encodeURIComponent(category)}/threads`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ title, body }),
+    body: JSON.stringify({ title, body, attachment_ids }),
   });
 
   if (!res.ok) {

@@ -13,10 +13,19 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
   const cookie = request.headers.get('cookie');
   const { headers } = mutationHeaders(cookie, form);
 
-  const payload: { body: string; reply_to_post_id?: number } = { body };
+  const payload: { body: string; reply_to_post_id?: number; attachment_ids?: number[] } = {
+    body,
+  };
   if (replyTo) {
     const n = Number(replyTo);
     if (Number.isFinite(n)) payload.reply_to_post_id = n;
+  }
+  const attRaw = String(form.get('attachment_ids') || '').trim();
+  if (attRaw) {
+    payload.attachment_ids = attRaw
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
   }
 
   const res = await fetch(

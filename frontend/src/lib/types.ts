@@ -3,6 +3,8 @@ export type UserPublic = {
   username: string;
   display_name: string | null;
   bio?: string | null;
+  avatar_url?: string | null;
+  email_verified?: boolean;
   role: string;
   is_active: boolean;
   created_at: string;
@@ -77,6 +79,7 @@ export type Thread = {
   updated_at: string;
   author_username: string;
   author_display_name: string | null;
+  author_avatar_url?: string | null;
 };
 
 export type Post = {
@@ -94,6 +97,9 @@ export type Post = {
   author_display_name: string | null;
   helpful_count?: number;
   viewer_marked_helpful?: boolean;
+  author_avatar_url?: string | null;
+  attachments?: Attachment[];
+  embeds?: LinkEmbed[];
 };
 
 export type Draft = {
@@ -164,4 +170,25 @@ export type AuditEntry = {
   target_id?: number | null;
   meta?: string | null;
   created_at: string;
+};
+
+export type Attachment = {
+  id: number;
+  url: string;
+  thumb_url?: string | null;
+  mime: string;
+  size_bytes: number;
+  width?: number | null;
+  height?: number | null;
+  original_name?: string | null;
+};
+
+export type LinkEmbed = {
+  url_hash: string;
+  url: string;
+  title?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  site_name?: string | null;
+  status: string;
 };
