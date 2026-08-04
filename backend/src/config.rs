@@ -18,12 +18,22 @@ pub struct Config {
     pub jwt_secret: String,
     pub jwt_ttl: Duration,
     pub cookie_secure: bool,
+    /// Send Strict-Transport-Security (also implied when cookie_secure).
+    pub enable_hsts: bool,
+    /// `development` | `production` — production refuses weak secrets.
+    pub forum_env: String,
     pub cors_origin: String,
     pub rust_log: String,
     /// Local media root (uploads live under `{data_dir}/uploads`).
     pub data_dir: PathBuf,
     /// Public site origin for links in emails (e.g. http://localhost:4321).
     pub public_origin: String,
+}
+
+fn env_truthy(key: &str, default: bool) -> bool {
+    env::var(key)
+        .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(default)
 }
 
 impl Config {
@@ -44,9 +54,11 @@ impl Config {
             .transpose()
             .context("JWT_TTL_SECS must be a positive integer")?
             .unwrap_or(DEFAULT_JWT_TTL_SECS);
-        let cookie_secure = env::var("COOKIE_SECURE")
-            .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
-            .unwrap_or(false);
+        let cookie_secure = env_truthy("COOKIE_SECURE", false);
+        let enable_hsts = env_truthy("ENABLE_HSTS", cookie_secure);
+        let forum_env = env::var("FORUM_ENV")
+            .unwrap_or_else(|_| "development".into())
+            .to_ascii_lowercase();
         let cors_origin =
             env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:4321".into());
         let rust_log = env::var("RUST_LOG").unwrap_or_else(|_| "info,forum_backend=debug".into());
@@ -62,6 +74,22 @@ impl Config {
             bail!("JWT_TTL_SECS must be greater than 0");
         }
 
+        let is_prod = forum_env == "production" || forum_env == "prod";
+        if is_prod {
+            let weak = jwt_secret == "dev-only-change-me"
+                || jwt_secret == "dev-only-change-me-please"
+                || jwt_secret == "change-me-to-a-long-random-string-at-least-32-chars"
+                || jwt_secret.len() < 32;
+            if weak {
+                bail!("FORUM_ENV=production requires a strong JWT_SECRET (32+ random chars)");
+            }
+            if !cookie_secure {
+                eprintln!(
+                    "warning: COOKIE_SECURE=false under production — set COOKIE_SECURE=true behind HTTPS"
+                );
+            }
+        }
+
         Ok(Self {
             host,
             port,
@@ -69,6 +97,8 @@ impl Config {
             jwt_secret,
             jwt_ttl: Duration::from_secs(jwt_ttl_secs),
             cookie_secure,
+            enable_hsts,
+            forum_env,
             cors_origin,
             rust_log,
             data_dir,
@@ -96,6 +126,8 @@ mod tests {
             jwt_secret: "long-enough-secret".into(),
             jwt_ttl: Duration::from_secs(DEFAULT_JWT_TTL_SECS),
             cookie_secure: false,
+            enable_hsts: false,
+            forum_env: "development".into(),
             cors_origin: "http://localhost:4321".into(),
             rust_log: "info".into(),
             data_dir: PathBuf::from("./data"),

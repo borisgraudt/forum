@@ -1,14 +1,15 @@
 .PHONY: help dev dev-backend dev-frontend build lint lint-backend lint-frontend \
 	fmt fmt-check test test-backend test-smoke migrate migrate-info db-create db-reset \
 	audit audit-backend audit-frontend clean setup ci \
-	package docker-build docker-up docker-down release-dry
+	package docker-build docker-up docker-down release-dry \
+	seed backup restore load-smoke
 
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 BACKEND := $(ROOT)/backend
 FRONTEND := $(ROOT)/frontend
 
 export DATABASE_URL ?= sqlite:$(BACKEND)/forum.db?mode=rwc
-export VERSION ?= 0.5.0
+export VERSION ?= 0.8.0
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | \
@@ -117,6 +118,19 @@ test-backend: ## Backend unit/integration tests
 
 test-smoke: ## Smoke e2e (API + frontend BFF). Needs :3000 + :4321 up.
 	@bash $(ROOT)/scripts/smoke-e2e.sh
+
+seed: ## Idempotent demo data (admin + sample categories/thread)
+	cd $(BACKEND) && cargo run --quiet -- seed
+
+backup: ## Snapshot SQLite (+ media) into backups/
+	@bash $(ROOT)/scripts/backup-sqlite.sh "$(BACKEND)/forum.db" "$(ROOT)/backups"
+
+restore: ## Restore DB: make restore BACKUP=backups/forum-….db
+	@test -n "$(BACKUP)" || (echo "Usage: make restore BACKUP=backups/forum-….db" && exit 1)
+	@bash $(ROOT)/scripts/restore-sqlite.sh "$(BACKUP)" "$(BACKEND)/forum.db"
+
+load-smoke: ## Tiny API load baseline (needs :3000)
+	@bash $(ROOT)/scripts/load-smoke.sh http://127.0.0.1:3000 50
 
 migrate: ## Apply sqlx migrations
 	cd $(BACKEND) && sqlx database create || true

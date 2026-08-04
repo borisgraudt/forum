@@ -26,7 +26,7 @@ use crate::handlers::{
     threads_router, users_router,
 };
 use crate::middleware::{CsrfLayer, RateLimitLayer, SecurityHeadersLayer};
-use crate::services::StorageService;
+use crate::services::{SeedService, StorageService};
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -37,6 +37,9 @@ struct HealthResponse {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let mut args = std::env::args().skip(1);
+    let cmd = args.next();
+
     let config = Config::from_env()?;
 
     tracing_subscriber::fmt()
@@ -47,11 +50,34 @@ async fn main() -> anyhow::Result<()> {
     db::migrate(&pool).await?;
     StorageService::ensure_dirs(&config.data_dir).await?;
 
-    let addr = config.socket_addr()?;
-    let state = AppState::new(config.clone(), pool);
-    let app = build_router(state, &config.cors_origin)?;
+    match cmd.as_deref() {
+        Some("seed") => {
+            let summary = SeedService::run(&pool).await?;
+            println!("{summary}");
+            return Ok(());
+        }
+        Some("help") | Some("-h") | Some("--help") => {
+            eprintln!(
+                "forum-backend — Forum API\n\n\
+                 Usage:\n\
+                   forum-backend           Start HTTP server\n\
+                   forum-backend seed      Idempotent demo data (admin + sample topics)\n\
+                   forum-backend help      Show this help\n"
+            );
+            return Ok(());
+        }
+        Some(other) => {
+            anyhow::bail!("unknown command '{other}' (try: seed, help)");
+        }
+        None => {}
+    }
 
-    tracing::info!(%addr, "listening");
+    let addr = config.socket_addr()?;
+    let enable_hsts = config.enable_hsts;
+    let state = AppState::new(config.clone(), pool);
+    let app = build_router(state, &config.cors_origin, enable_hsts)?;
+
+    tracing::info!(%addr, env = %config.forum_env, "listening");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -60,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
+fn build_router(state: AppState, cors_origin: &str, enable_hsts: bool) -> anyhow::Result<Router> {
     let origin = HeaderValue::from_str(cors_origin)
         .map_err(|e| anyhow::anyhow!("invalid CORS_ORIGIN: {e}"))?;
 
@@ -86,7 +112,11 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
     // security headers ← rate limit ← csrf ← trace ← routes
     Ok(Router::new()
         .route("/health", get(health))
+        .route("/ready", get(health))
         .route("/api/v1/health", get(health))
+        .route("/api/v1/ready", get(health))
+        .route("/metrics", get(metrics))
+        .route("/api/v1/metrics", get(metrics))
         // Immutable media: long-cache, no CSRF (GET only).
         .merge(media_public_router())
         .nest("/api/v1/auth", auth_router())
@@ -107,7 +137,7 @@ fn build_router(state: AppState, cors_origin: &str) -> anyhow::Result<Router> {
         .layer(TraceLayer::new_for_http())
         .layer(CsrfLayer)
         .layer(RateLimitLayer::default())
-        .layer(SecurityHeadersLayer)
+        .layer(SecurityHeadersLayer::new(enable_hsts))
         .layer(cors)
         .with_state(state))
 }
@@ -125,6 +155,41 @@ async fn health(State(state): State<AppState>) -> AppResult<(StatusCode, Json<He
             service: "forum-backend",
         }),
     ))
+}
+
+/// Prometheus text exposition (no extra deps) — scrape-friendly.
+async fn metrics(State(state): State<AppState>) -> AppResult<(StatusCode, String)> {
+    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&state.db)
+        .await?;
+    let categories: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM categories")
+        .fetch_one(&state.db)
+        .await?;
+    let threads: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM threads")
+        .fetch_one(&state.db)
+        .await?;
+    let posts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts")
+        .fetch_one(&state.db)
+        .await?;
+
+    let body = format!(
+        "# HELP forum_up 1 if the process is serving traffic\n\
+         # TYPE forum_up gauge\n\
+         forum_up 1\n\
+         # HELP forum_users_total Registered users\n\
+         # TYPE forum_users_total gauge\n\
+         forum_users_total {users}\n\
+         # HELP forum_categories_total Categories\n\
+         # TYPE forum_categories_total gauge\n\
+         forum_categories_total {categories}\n\
+         # HELP forum_threads_total Threads\n\
+         # TYPE forum_threads_total gauge\n\
+         forum_threads_total {threads}\n\
+         # HELP forum_posts_total Posts\n\
+         # TYPE forum_posts_total gauge\n\
+         forum_posts_total {posts}\n"
+    );
+    Ok((StatusCode::OK, body))
 }
 
 async fn shutdown_signal() {
@@ -171,6 +236,8 @@ mod tests {
             jwt_secret: "test-secret-at-least-16".into(),
             jwt_ttl: Duration::from_secs(3600),
             cookie_secure: false,
+            enable_hsts: false,
+            forum_env: "development".into(),
             cors_origin: "http://localhost:4321".into(),
             rust_log: "error".into(),
             data_dir: std::env::temp_dir().join(format!("forum-test-{}", std::process::id())),
@@ -239,7 +306,7 @@ mod tests {
     #[tokio::test]
     async fn health_returns_ok() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state, "http://localhost:4321", false).expect("router");
 
         let response = app
             .oneshot(
@@ -262,7 +329,7 @@ mod tests {
     #[tokio::test]
     async fn register_login_me_logout_flow() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state, "http://localhost:4321", false).expect("router");
         let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
 
         // Register
@@ -378,7 +445,7 @@ mod tests {
     #[tokio::test]
     async fn login_rejects_bad_password() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state, "http://localhost:4321", false).expect("router");
         let _ = register_cookie(&app, "bob").await;
 
         let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
@@ -405,7 +472,7 @@ mod tests {
     #[tokio::test]
     async fn register_rejects_duplicate_username() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state, "http://localhost:4321", false).expect("router");
 
         let payload = serde_json::json!({
             "username": "carol",
@@ -454,7 +521,7 @@ mod tests {
     #[tokio::test]
     async fn register_validates_short_password() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state, "http://localhost:4321", false).expect("router");
         let (csrf_cookie, csrf_token) = csrf_pair(&app).await;
 
         let response = app
@@ -515,7 +582,7 @@ mod tests {
     #[tokio::test]
     async fn forum_crud_category_thread_post_flow() {
         let state = test_state().await;
-        let app = build_router(state.clone(), "http://localhost:4321").expect("router");
+        let app = build_router(state.clone(), "http://localhost:4321", false).expect("router");
         let (cookie, csrf) = register_cookie(&app, "erin").await;
 
         // Categories are admin-only.
@@ -650,7 +717,7 @@ mod tests {
     #[tokio::test]
     async fn create_thread_requires_auth() {
         let state = test_state().await;
-        let app = build_router(state.clone(), "http://localhost:4321").expect("router");
+        let app = build_router(state.clone(), "http://localhost:4321", false).expect("router");
         let (cookie, csrf) = register_cookie(&app, "frank").await;
         sqlx::query("UPDATE users SET role = 'admin' WHERE username = 'frank'")
             .execute(&state.db)
@@ -696,7 +763,7 @@ mod tests {
     #[tokio::test]
     async fn security_headers_present() {
         let state = test_state().await;
-        let app = build_router(state, "http://localhost:4321").expect("router");
+        let app = build_router(state, "http://localhost:4321", false).expect("router");
         let response = app
             .oneshot(
                 Request::builder()

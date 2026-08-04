@@ -4,7 +4,7 @@ Fast, low-resource forum engine: **Rust (Axum + SQLite)** API + **Astro** SSR UI
 
 Hierarchy: **Community → subcategory → topic → posts**. UI inspired by Apple Discussions.
 
-**Current version:** `0.7.0`
+**Current version:** `0.8.0`
 
 ---
 
@@ -26,6 +26,9 @@ Hierarchy: **Community → subcategory → topic → posts**. UI inspired by App
 forum/
 ├── backend/          # API + migrations
 ├── frontend/         # Astro UI
+├── deploy/           # Caddy / nginx reverse-proxy examples
+├── docs/             # ops runbook + OpenAPI sketch
+├── scripts/          # backup, restore, smoke, load
 ├── .github/workflows/
 ├── docker-compose.yml
 ├── Makefile
@@ -68,6 +71,11 @@ make setup && make migrate && make dev
 | `make build` | Release backend + frontend build |
 | `make package` | Portable tarball under `dist/` |
 | `make docker-up` | Compose stack |
+| `make seed` | Demo admin + sample community |
+| `make backup` / `make restore BACKUP=…` | SQLite snapshot |
+| `make load-smoke` | Tiny API load baseline |
+
+See **[docs/ops.md](docs/ops.md)** for production env, TLS proxy, and restore.
 
 ### Moderator / admin
 
@@ -162,13 +170,14 @@ Goal for **v1.0**: not a MVP — a **complete, fast, phone-first community produ
 - [ ] Optional: `srcset` variants for large media; offline SW
 
 ### v0.8 — Ops & multi-community scale
-- [ ] Production defaults: HSTS, Secure cookies, reverse-proxy recipes
-- [ ] **Backups** (SQLite snapshot + restore runbook)
-- [ ] Structured logs + metrics (Prometheus/OpenTelemetry)
-- [ ] E2E CI (Playwright) + load test baseline
-- [ ] **Multi-tenant / multi-site** mode (one binary, many communities)
-- [ ] OpenAPI for `/api/v1` + seed/demo command
-- [ ] i18n (RU/EN minimum)
+- [x] Production defaults: `FORUM_ENV`, HSTS, Secure cookies, Caddy/nginx recipes
+- [x] **Backups** (SQLite `.backup` + restore scripts + ops runbook)
+- [x] Prometheus-style **`/metrics`** + structured tracing (`RUST_LOG`)
+- [x] Smoke e2e script + **load-smoke** baseline
+- [x] OpenAPI sketch (`docs/openapi.yaml`) + **`forum-backend seed`**
+- [ ] **Multi-tenant / multi-site** mode (later)
+- [ ] i18n (RU/EN minimum) (later)
+- [ ] Playwright CI (optional; bash smoke covers core flows)
 
 ### v0.9 — Polish & “cooler than NodeBB” bar
 - [ ] Design system tokens + dark mode

@@ -25,8 +25,12 @@ services:
       DATABASE_URL: sqlite:/data/forum.db?mode=rwc
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-please}
       JWT_TTL_SECS: ${JWT_TTL_SECS:-604800}
+      FORUM_ENV: ${FORUM_ENV:-development}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ENABLE_HSTS: ${ENABLE_HSTS:-false}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4321}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:4321}
+      DATA_DIR: /data
       RUST_LOG: ${RUST_LOG:-info,forum_backend=info}
     volumes:
       - forum-data:/data
