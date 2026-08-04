@@ -299,7 +299,11 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
           ) : (
             <>
               <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
-              <PostMedia attachments={op.attachments} embeds={op.embeds} />
+              <PostMedia
+                attachments={op.attachments}
+                embeds={op.embeds}
+                body={op.body_html || op.body}
+              />
             </>
           )}
           <p class="ad-post__posted">
@@ -489,7 +493,11 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
             ) : (
               <>
                 <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
-                <PostMedia attachments={topReply.attachments} embeds={topReply.embeds} />
+                <PostMedia
+                  attachments={topReply.attachments}
+                  embeds={topReply.embeds}
+                  body={topReply.body_html || topReply.body}
+                />
               </>
             )}
 
@@ -668,7 +676,11 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 ) : (
                   <>
                     <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
-                    <PostMedia attachments={post.attachments} embeds={post.embeds} />
+                    <PostMedia
+                      attachments={post.attachments}
+                      embeds={post.embeds}
+                      body={post.body_html || post.body}
+                    />
                   </>
                 )}
 
