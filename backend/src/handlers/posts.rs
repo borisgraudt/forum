@@ -127,13 +127,29 @@ async fn create_post(
         }
     }
 
-    // Prefetch link embeds in background (don't block response — mega-fast path).
+    // Prefetch embeds + notify watchers off the hot path (no latency on reply).
     let db = state.db.clone();
     let body_for_embed = body_text.clone();
+    let thread_id = thread.id;
+    let category_id = category.id;
+    let actor_id = user.id;
+    let post_id = post.id;
+    let actor_name = user.username.clone();
     tokio::spawn(async move {
         for url in crate::services::EmbedService::extract_urls(&body_for_embed, 3) {
             let _ = crate::services::EmbedService::get_or_fetch(&db, &url).await;
         }
+        let _ = crate::services::EngagementService::notify_watchers(
+            &db,
+            thread_id,
+            category_id,
+            actor_id,
+            "reply",
+            Some(post_id),
+            &format!("@{actor_name} replied"),
+        )
+        .await;
+        let _ = crate::services::EngagementService::watch(&db, actor_id, "thread", thread_id).await;
     });
 
     let mut json = PostViewJson::from(post);

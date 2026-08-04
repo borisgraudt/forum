@@ -5,6 +5,7 @@
 
 mod category;
 mod draft;
+mod engagement;
 mod media;
 mod moderation;
 mod post;
@@ -13,6 +14,7 @@ mod user;
 
 pub use category::Category;
 pub use draft::Draft;
+pub use engagement::Notification;
 pub use media::{Attachment, AttachmentJson};
 pub use moderation::{
     AuditEntry, Report, ReportView, SanctionKind, UserSanction, UserSanctionView,

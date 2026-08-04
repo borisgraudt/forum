@@ -18,6 +18,10 @@ if (!slug) return Astro.redirect('/');
 
 const cookie = getCookieHeader(Astro.request);
 const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
+const sortRaw = Astro.url.searchParams.get('sort') || 'activity';
+const sort = ['activity', 'newest', 'unanswered', 'solved'].includes(sortRaw)
+  ? sortRaw
+  : 'activity';
 const limit = 20;
 const offset = (page - 1) * limit;
 
@@ -36,7 +40,7 @@ try {
   parent = data.parent ?? null;
   children = data.children ?? [];
   if (category.parent_id !== null || children.length === 0) {
-    const list = await listThreads(slug, cookie, { limit, offset });
+    const list = await listThreads(slug, cookie, { limit, offset, sort });
     threads = list.threads;
     total = list.total;
   }
@@ -114,6 +118,23 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
             <div class="topic-toolbar">
               <span class="topic-toolbar__label">Thread</span>
               <div class="topic-toolbar__right">
+                <nav class="topic-sort" aria-label="Sort topics">
+                  {(
+                    [
+                      ['activity', 'Active'],
+                      ['newest', 'New'],
+                      ['unanswered', 'Unanswered'],
+                      ['solved', 'Solved'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <a
+                      href={`/categories/${category.slug}?sort=${key}`}
+                      class:list={['topic-sort__link', { 'is-active': sort === key }]}
+                    >
+                      {label}
+                    </a>
+                  ))}
+                </nav>
                 <span class="topic-toolbar__hint">
                   {total} {total === 1 ? 'topic' : 'topics'}
                 </span>
@@ -163,6 +184,8 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
                             <span class="topic-list__title">
                               {t.is_pinned && <span class="badge">Pinned</span>}
                               {t.is_locked && <span class="badge badge--muted">Locked</span>}
+                              {t.is_solved && <span class="badge badge--ok">Solved</span>}
+                              {t.is_unread && <span class="badge">New</span>}
                               {t.title}
                             </span>
                             <span class="topic-list__meta">
@@ -196,7 +219,7 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
                     {page > 1 ? (
                       <a
                         class="btn btn-secondary btn-sm"
-                        href={`/categories/${category.slug}?page=${page - 1}`}
+                        href={`/categories/${category.slug}?sort=${sort}&page=${page - 1}`}
                       >
                         Previous
                       </a>
@@ -211,7 +234,7 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
                     {page < totalPages ? (
                       <a
                         class="btn btn-secondary btn-sm"
-                        href={`/categories/${category.slug}?page=${page + 1}`}
+                        href={`/categories/${category.slug}?sort=${sort}&page=${page + 1}`}
                       >
                         Next
                       </a>

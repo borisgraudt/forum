@@ -458,6 +458,28 @@ p {
 }
 
 /* —— Topic list (example3 / example4), no stripes —— */
+.topic-sort {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.55rem;
+  align-items: center;
+  font-size: 0.8125rem;
+}
+.topic-sort__link {
+  color: var(--text-secondary, #6e6e73);
+  text-decoration: none;
+}
+.topic-sort__link:hover {
+  color: var(--text, #1d1d1f);
+}
+.topic-sort__link.is-active {
+  color: var(--text, #1d1d1f);
+  font-weight: 600;
+}
+.badge--ok {
+  background: color-mix(in srgb, #34c759 18%, transparent);
+  color: #1b7a34;
+}
 .topic-toolbar {
   display: flex;
   align-items: center;

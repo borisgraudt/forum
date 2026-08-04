@@ -73,6 +73,8 @@ export type Thread = {
   is_locked: boolean;
   post_count: number;
   view_count: number;
+  is_solved?: boolean;
+  accepted_post_id?: number | null;
   me_too_count?: number;
   last_post_at: string | null;
   created_at: string;
@@ -80,6 +82,8 @@ export type Thread = {
   author_username: string;
   author_display_name: string | null;
   author_avatar_url?: string | null;
+  is_unread?: boolean | null;
+  viewer_watching?: boolean | null;
 };
 
 export type Post = {

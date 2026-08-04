@@ -179,17 +179,50 @@ export async function listChildren(slug: string, cookie?: string | null) {
 export async function listThreads(
   categorySlug: string,
   cookie?: string | null,
-  page: { limit?: number; offset?: number } = {},
+  page: { limit?: number; offset?: number; sort?: string } = {},
 ) {
   const qs = new URLSearchParams();
   if (page.limit != null) qs.set('limit', String(page.limit));
   if (page.offset != null) qs.set('offset', String(page.offset));
+  if (page.sort) qs.set('sort', page.sort);
   const q = qs.toString();
   const data = await request<{ threads: Thread[] } & PageMeta>(
     `/categories/${encodeURIComponent(categorySlug)}/threads${q ? `?${q}` : ''}`,
     { cookie },
   );
   return data;
+}
+
+export async function getUnreadCount(cookie?: string | null) {
+  try {
+    const data = await request<{ count: number }>('/notifications/unread-count', { cookie });
+    return data.count;
+  } catch {
+    return 0;
+  }
+}
+
+export async function listNotifications(
+  cookie?: string | null,
+  page: { limit?: number; offset?: number; unreadOnly?: boolean } = {},
+) {
+  const qs = new URLSearchParams();
+  if (page.limit != null) qs.set('limit', String(page.limit));
+  if (page.offset != null) qs.set('offset', String(page.offset));
+  if (page.unreadOnly) qs.set('sort', 'unread');
+  const q = qs.toString();
+  return request<{
+    notifications: Array<{
+      id: number;
+      kind: string;
+      body: string;
+      is_read: boolean;
+      created_at: string;
+      thread_id?: number | null;
+    }>;
+    total: number;
+    unread: number;
+  }>(`/notifications${q ? `?${q}` : ''}`, { cookie });
 }
 
 export async function getThread(categorySlug: string, threadSlug: string, cookie?: string | null) {

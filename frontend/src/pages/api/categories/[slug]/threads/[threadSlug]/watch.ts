@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { mutationHeaders } from '../../../../../../../../lib/api';
+import { mutationHeaders } from '../../../../../../lib/api';
 
 const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://127.0.0.1:3000/api/v1';
 
@@ -9,8 +9,8 @@ function wantsJson(request: Request) {
 }
 
 export const POST: APIRoute = async ({ params, request, redirect }) => {
-  const { slug, threadSlug, postId } = params;
-  if (!slug || !threadSlug || !postId) {
+  const { slug, threadSlug } = params;
+  if (!slug || !threadSlug) {
     if (wantsJson(request)) {
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
@@ -23,11 +23,11 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
   const form = await request.formData();
   const cookie = request.headers.get('cookie');
   const { headers } = mutationHeaders(cookie, form);
-  const action = String(form.get('action') || 'add');
-  const method = action === 'remove' ? 'DELETE' : 'POST';
+  const action = String(form.get('action') || 'watch');
+  const method = action === 'unwatch' ? 'DELETE' : 'POST';
 
   const res = await fetch(
-    `${API_BASE}/categories/${encodeURIComponent(slug)}/threads/${encodeURIComponent(threadSlug)}/posts/${encodeURIComponent(postId)}/helpful`,
+    `${API_BASE}/categories/${encodeURIComponent(slug)}/threads/${encodeURIComponent(threadSlug)}/watch`,
     {
       method,
       headers: {
@@ -38,17 +38,14 @@ export const POST: APIRoute = async ({ params, request, redirect }) => {
   );
 
   if (wantsJson(request)) {
-    const data = await res.json().catch(() => ({ error: 'Vote failed' }));
+    const data = await res
+      .json()
+      .catch(() => (res.ok ? { watching: method === 'POST' } : { error: 'Watch failed' }));
     return new Response(JSON.stringify(data), {
       status: res.status,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
   }
 
-  const dest = `/categories/${slug}/threads/${threadSlug}`;
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({ error: 'Vote failed' }));
-    return redirect(`${dest}?error=${encodeURIComponent(data.error || 'Vote failed')}`, 303);
-  }
-  return redirect(dest, 303);
+  return redirect(`/categories/${slug}/threads/${threadSlug}`, 303);
 };

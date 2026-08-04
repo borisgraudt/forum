@@ -1,0 +1,70 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CsrfInput from '../components/CsrfInput.astro';
+import {
+  applySetCookies,
+  ensureCsrf,
+  formatWhen,
+  getCookieHeader,
+  getMe,
+  listNotifications,
+} from '../lib/api';
+
+const cookie = getCookieHeader(Astro.request);
+const user = await getMe(cookie);
+if (!user) return Astro.redirect('/login');
+
+const csrf = await ensureCsrf(cookie);
+applySetCookies(Astro.response, csrf.setCookies);
+
+let items: Awaited<ReturnType<typeof listNotifications>>['notifications'] = [];
+let unread = 0;
+let error: string | null = null;
+try {
+  const data = await listNotifications(cookie, { limit: 50 });
+  items = data.notifications;
+  unread = data.unread;
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Could not load';
+}
+---
+
+<BaseLayout title="Notifications" user={user}>
+  <div class="settings-page">
+    <h1 class="settings-page__title">Notifications</h1>
+    <p class="settings-page__lead">
+      {unread > 0 ? `${unread} unread` : 'You are all caught up.'}
+    </p>
+    {
+      unread > 0 && (
+        <form method="POST" action="/api/notifications/read" class="ask-actions">
+          <CsrfInput token={csrf.token} />
+          <button class="btn btn-secondary btn-sm" type="submit">
+            Mark all read
+          </button>
+        </form>
+      )
+    }
+    {error && <div class="alert">{error}</div>}
+    {
+      items.length === 0 ? (
+        <p class="ad-empty">No notifications yet. Watch a thread to get replies here.</p>
+      ) : (
+        <ul class="profile-activity__list">
+          {items.map((n) => (
+            <li class:list={[{ 'notif--unread': !n.is_read }]}>
+              <strong>{n.body || n.kind}</strong>
+              <span class="profile-activity__meta">{formatWhen(n.created_at)}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .notif--unread {
+    font-weight: 600;
+  }
+</style>

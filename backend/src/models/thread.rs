@@ -12,6 +12,8 @@ pub struct Thread {
     pub is_locked: bool,
     pub post_count: i64,
     pub view_count: i64,
+    pub is_solved: bool,
+    pub accepted_post_id: Option<i64>,
     pub last_post_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -28,6 +30,8 @@ pub struct ThreadView {
     pub is_locked: bool,
     pub post_count: i64,
     pub view_count: i64,
+    pub is_solved: bool,
+    pub accepted_post_id: Option<i64>,
     pub last_post_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -36,4 +40,11 @@ pub struct ThreadView {
     /// Absolute-path media URL (`/media/...`) when the author has an avatar.
     pub author_avatar_url: Option<String>,
     pub me_too_count: i64,
+    /// Present when list is loaded for an authenticated viewer with watches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[sqlx(default)]
+    pub is_unread: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[sqlx(default)]
+    pub viewer_watching: Option<bool>,
 }
