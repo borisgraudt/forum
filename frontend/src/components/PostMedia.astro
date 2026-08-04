@@ -1,0 +1,47 @@
+---
+import { mediaUrl } from '../lib/api';
+import type { Attachment, LinkEmbed } from '../lib/types';
+
+type Props = {
+  attachments?: Attachment[] | null;
+  embeds?: LinkEmbed[] | null;
+};
+
+const { attachments = [], embeds = [] } = Astro.props;
+const atts = attachments ?? [];
+const embs = embeds ?? [];
+---
+
+{
+  atts.length > 0 && (
+    <div class="post-media">
+      {atts.map((a) => (
+        <a href={mediaUrl(a.url)!} target="_blank" rel="noopener">
+          <img
+            src={mediaUrl(a.thumb_url || a.url)!}
+            alt={a.original_name || ''}
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
+      ))}
+    </div>
+  )
+}
+
+{
+  embs.length > 0 && (
+    <div class="embed-list">
+      {embs.map((e) => (
+        <a class="embed-card" href={e.url} target="_blank" rel="noopener noreferrer">
+          {e.image_url && <img class="embed-card__img" src={e.image_url} alt="" loading="lazy" />}
+          <span class="embed-card__body">
+            {e.site_name && <span class="embed-card__site">{e.site_name}</span>}
+            <span class="embed-card__title">{e.title || e.url}</span>
+            {e.description && <span class="embed-card__desc">{e.description}</span>}
+          </span>
+        </a>
+      ))}
+    </div>
+  )
+}

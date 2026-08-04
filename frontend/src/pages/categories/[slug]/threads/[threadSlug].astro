@@ -2,6 +2,7 @@
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import Avatar from '../../../../components/Avatar.astro';
 import CsrfInput from '../../../../components/CsrfInput.astro';
+import PostMedia from '../../../../components/PostMedia.astro';
 import {
   ApiRequestError,
   API_ORIGIN,
@@ -245,36 +246,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
           ) : (
             <>
               <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
-              {(op.attachments?.length ?? 0) > 0 && (
-                <div class="post-media">
-                  {op.attachments!.map((a) => (
-                    <a href={mediaUrl(a.url)!} target="_blank" rel="noopener">
-                      <img
-                        src={mediaUrl(a.thumb_url || a.url)!}
-                        alt={a.original_name || ''}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </a>
-                  ))}
-                </div>
-              )}
-              {(op.embeds?.length ?? 0) > 0 && (
-                <div class="embed-list">
-                  {op.embeds!.map((e) => (
-                    <a class="embed-card" href={e.url} target="_blank" rel="noopener noreferrer">
-                      {e.image_url && (
-                        <img class="embed-card__img" src={e.image_url} alt="" loading="lazy" />
-                      )}
-                      <span class="embed-card__body">
-                        {e.site_name && <span class="embed-card__site">{e.site_name}</span>}
-                        <span class="embed-card__title">{e.title || e.url}</span>
-                        {e.description && <span class="embed-card__desc">{e.description}</span>}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              )}
+              <PostMedia attachments={op.attachments} embeds={op.embeds} />
             </>
           )}
           <p class="ad-post__posted">
@@ -461,7 +433,10 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
             ) : topReply.is_deleted ? (
               <p class="ad-post__deleted">This reply was deleted.</p>
             ) : (
-              <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
+              <>
+                <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
+                <PostMedia attachments={topReply.attachments} embeds={topReply.embeds} />
+              </>
             )}
 
             {!topReply.is_deleted && editId !== topReply.id && (
@@ -636,7 +611,10 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 ) : post.is_deleted ? (
                   <p class="ad-post__deleted">This reply was deleted.</p>
                 ) : (
-                  <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
+                  <>
+                    <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
+                    <PostMedia attachments={post.attachments} embeds={post.embeds} />
+                  </>
                 )}
 
                 {!post.is_deleted && editId !== post.id && (
