@@ -1260,16 +1260,22 @@ a.ad-post__name:hover {
 }
 
 .profile-hero__avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--ink-soft);
-  color: var(--ink);
-  display: grid;
-  place-items: center;
-  font-size: 22px;
-  font-weight: 600;
   flex-shrink: 0;
+  line-height: 0;
+}
+
+.profile-btn--avatar {
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.profile-btn--avatar .avatar {
+  display: block;
 }
 
 .profile-hero__name {

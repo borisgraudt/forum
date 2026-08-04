@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Avatar from '../../../../components/Avatar.astro';
 import CsrfInput from '../../../../components/CsrfInput.astro';
 import {
   ApiRequestError,
@@ -11,7 +12,6 @@ import {
   getCategory,
   getCookieHeader,
   getMe,
-  initials,
   isModerator,
   listDrafts,
   listPostEdits,
@@ -127,10 +127,6 @@ function bodyHtml(post: Post) {
   return h;
 }
 
-function avatarSrc(url?: string | null) {
-  return mediaUrl(url);
-}
-
 function replyHref(postId?: number) {
   if (!user || !category || !thread) return '/login';
   if (postId) {
@@ -226,9 +222,13 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
 
         <article class="ad-post ad-post--op" id={`post-${op.id}`}>
           <header class="ad-post__head">
-            <a class="ad-post__avatar" href={authorHref(op.author_username)} aria-hidden="true">
-              {initials(opAuthor)}
-            </a>
+            <Avatar
+              class="ad-post__avatar"
+              name={opAuthor}
+              src={op.author_avatar_url}
+              size={40}
+              href={authorHref(op.author_username)}
+            />
             <div class="ad-post__who">
               <div class="ad-post__name-row">
                 <a class="ad-post__name" href={authorHref(op.author_username)}>
@@ -392,13 +392,13 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
             id={`post-${topReply.id}`}
           >
             <header class="ad-post__head">
-              <a
+              <Avatar
                 class="ad-post__avatar"
+                name={authorLabel(topReply)}
+                src={topReply.author_avatar_url}
+                size={40}
                 href={authorHref(topReply.author_username)}
-                aria-hidden="true"
-              >
-                {initials(authorLabel(topReply))}
-              </a>
+              />
               <div class="ad-post__who">
                 <div class="ad-post__name-row">
                   <a class="ad-post__name" href={authorHref(topReply.author_username)}>
@@ -555,13 +555,13 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 id={`post-${post.id}`}
               >
                 <header class="ad-post__head">
-                  <a
+                  <Avatar
                     class="ad-post__avatar"
+                    name={who}
+                    src={post.author_avatar_url}
+                    size={40}
                     href={authorHref(post.author_username)}
-                    aria-hidden="true"
-                  >
-                    {initials(who)}
-                  </a>
+                  />
                   <div class="ad-post__who">
                     <div class="ad-post__name-row">
                       <a class="ad-post__name" href={authorHref(post.author_username)}>
@@ -752,13 +752,12 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 <input type="hidden" name="reply_to_post_id" value={String(replyToPost.id)} />
               )}
               <div class="ad-reply__box">
-                <div class="ad-post__avatar ad-reply__avatar" aria-hidden="true">
-                  {user.avatar_url ? (
-                    <img src={avatarSrc(user.avatar_url)!} alt="" width="40" height="40" />
-                  ) : (
-                    initials(user.display_name || user.username)
-                  )}
-                </div>
+                <Avatar
+                  class="ad-post__avatar ad-reply__avatar"
+                  name={user.display_name || user.username}
+                  src={user.avatar_url}
+                  size={40}
+                />
                 <div class="ad-reply__editor-wrap">
                   <div class="ask-editor ad-reply__editor">
                     <textarea

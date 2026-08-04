@@ -1,4 +1,5 @@
 ---
+import Avatar from './Avatar.astro';
 import type { UserPublic } from '../lib/types';
 
 type Props = {
@@ -8,7 +9,6 @@ type Props = {
 
 const { user = null, active = null } = Astro.props;
 const display = user ? user.display_name || user.username : '';
-const initial = display ? display.slice(0, 1).toUpperCase() : '';
 const isAdmin = user?.role === 'admin';
 const isStaff = user?.role === 'moderator' || user?.role === 'admin';
 ---
@@ -28,8 +28,8 @@ const isStaff = user?.role === 'moderator' || user?.role === 'admin';
         user ? (
           <details class="profile-menu">
             <summary class="profile-menu__trigger" aria-label={`Account: ${display}`}>
-              <span class="profile-btn" aria-hidden="true">
-                {initial}
+              <span class="profile-btn profile-btn--avatar" aria-hidden="true">
+                <Avatar name={display} src={user.avatar_url} size={32} />
               </span>
             </summary>
             <div class="profile-menu__panel" role="menu">

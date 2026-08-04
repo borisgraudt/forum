@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Avatar from '../../components/Avatar.astro';
 import {
   ApiRequestError,
   authorLabel,
@@ -7,7 +8,6 @@ import {
   getCookieHeader,
   getMe,
   getUserProfile,
-  initials,
 } from '../../lib/api';
 import type { UserProfile } from '../../lib/types';
 
@@ -43,8 +43,8 @@ const recentPosts = profile?.recent_posts ?? [];
     ) : (
       <div class="profile-page">
         <header class="profile-hero">
-          <div class="profile-hero__avatar" aria-hidden="true">
-            {initials(display)}
+          <div class="profile-hero__avatar">
+            <Avatar name={display} src={p.avatar_url} size={72} />
           </div>
           <div class="profile-hero__meta">
             <h1 class="profile-hero__name">{display}</h1>
