@@ -122,8 +122,14 @@ const replyToPost =
 
 function bodyHtml(post: Post) {
   let h = post.body_html || post.body || '';
-  // Markdown images use /media/* on API host — rewrite for browser.
+  // Uploaded photos live in the bottom gallery (PostMedia) — strip inline
+  // ![](/media/...) so old posts don't double-render.
+  h = h.replace(/<p>\s*<img\b[^>]*\/media\/[^>]*>\s*<\/p>/gi, '');
+  h = h.replace(/<img\b[^>]*\/media\/[^>]*>/gi, '');
+  // Other markdown images (external) still need absolute API host if any /media left.
   h = h.replace(/(src|href)="\/media\//g, `$1="${API_ORIGIN}/media/`);
+  // Collapse empty paragraphs left after strip.
+  h = h.replace(/<p>\s*<\/p>/gi, '');
   return h;
 }
 
@@ -299,11 +305,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
           ) : (
             <>
               <div class="ad-post__body md-body" set:html={bodyHtml(op)} />
-              <PostMedia
-                attachments={op.attachments}
-                embeds={op.embeds}
-                body={op.body_html || op.body}
-              />
+              <PostMedia attachments={op.attachments} embeds={op.embeds} />
             </>
           )}
           <p class="ad-post__posted">
@@ -493,11 +495,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
             ) : (
               <>
                 <div class="ad-post__body md-body" set:html={bodyHtml(topReply)} />
-                <PostMedia
-                  attachments={topReply.attachments}
-                  embeds={topReply.embeds}
-                  body={topReply.body_html || topReply.body}
-                />
+                <PostMedia attachments={topReply.attachments} embeds={topReply.embeds} />
               </>
             )}
 
@@ -676,11 +674,7 @@ const threadBack = category && thread ? `/categories/${category.slug}/threads/${
                 ) : (
                   <>
                     <div class="ad-post__body md-body" set:html={bodyHtml(post)} />
-                    <PostMedia
-                      attachments={post.attachments}
-                      embeds={post.embeds}
-                      body={post.body_html || post.body}
-                    />
+                    <PostMedia attachments={post.attachments} embeds={post.embeds} />
                   </>
                 )}
 

@@ -5,43 +5,11 @@ import type { Attachment, LinkEmbed } from '../lib/types';
 type Props = {
   attachments?: Attachment[] | null;
   embeds?: LinkEmbed[] | null;
-  /** Raw post body or body_html — used to skip images already shown inline. */
-  body?: string | null;
 };
 
-const { attachments = [], embeds = [], body = '' } = Astro.props;
-const bodyText = body ?? '';
-
-/** True if this attachment is already rendered as markdown ![](/media/...). */
-function alreadyInline(a: Attachment): boolean {
-  const url = a.url || '';
-  if (!url) return false;
-  if (bodyText.includes(url)) return true;
-  // Match storage key even if body_html rewrote host (http://api/media/key).
-  const key = url.replace(/^\/media\//, '');
-  if (key && bodyText.includes(key)) return true;
-  if (a.thumb_url) {
-    if (bodyText.includes(a.thumb_url)) return true;
-    const tkey = a.thumb_url.replace(/^\/media\//, '');
-    if (tkey && bodyText.includes(tkey)) return true;
-  }
-  return false;
-}
-
-const atts = (attachments ?? []).filter((a) => !alreadyInline(a));
-
-// Skip OG cards for URLs that already appear as markdown images/links with a card-ish role
-// only when the URL is our own media (never re-card local uploads).
-const embs = (embeds ?? []).filter((e) => {
-  if (!e.url) return true;
-  try {
-    const path = new URL(e.url, 'http://local').pathname;
-    if (path.startsWith('/media/') && bodyText.includes(path)) return false;
-  } catch {
-    /* ignore */
-  }
-  return true;
-});
+const { attachments = [], embeds = [] } = Astro.props;
+const atts = attachments ?? [];
+const embs = embeds ?? [];
 ---
 
 {

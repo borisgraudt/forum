@@ -93,10 +93,8 @@
             bar.dataset.status = 'uploading';
             const data = await uploadImage(file, csrf);
             const att = data.attachment;
-            addId(att.id, att.thumb_url || att.url);
-            const md = `\n![image](${att.url})\n`;
-            const pos = ta.selectionStart;
-            ta.value = ta.value.slice(0, pos) + md + ta.value.slice(pos);
+            // Gallery-only: linked via attachment_ids, rendered under the post.
+            addId(att.id, mediaSrc(att.thumb_url || att.url));
             bar.dataset.status = 'ok';
           } catch (err) {
             bar.dataset.status = 'err';
@@ -125,13 +123,20 @@
       try {
         const data = await uploadImage(file, csrf);
         const att = data.attachment;
-        addId(att.id, att.thumb_url || att.url);
-        ta.value += `\n![image](${att.url})\n`;
+        addId(att.id, mediaSrc(att.thumb_url || att.url));
       } catch (err) {
         console.warn(err);
       }
       fileInput.value = '';
     });
+  }
+
+  function mediaSrc(path) {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    var m = document.querySelector('meta[name="api-origin"]');
+    var origin = (m && m.content) || '';
+    return origin + (path.charAt(0) === '/' ? path : '/' + path);
   }
 
   document.querySelectorAll('form[data-composer]').forEach(boot);
