@@ -1,9 +1,12 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import Avatar from '../../../components/Avatar.astro';
+import CsrfInput from '../../../components/CsrfInput.astro';
 import {
   ApiRequestError,
+  applySetCookies,
   authorLabel,
+  ensureCsrf,
   formatRelative,
   getCategory,
   getCookieHeader,
@@ -32,13 +35,19 @@ let children: Category[] = [];
 let threads: Thread[] = [];
 let total = 0;
 let error: string | null = null;
+let csrfToken = '';
+let viewerWatching = false;
 
 try {
-  const [me, data] = await Promise.all([getMe(cookie), getCategory(slug, cookie)]);
+  const csrfP = ensureCsrf(cookie);
+  const [me, data, csrf] = await Promise.all([getMe(cookie), getCategory(slug, cookie), csrfP]);
   user = me;
   category = data.category;
   parent = data.parent ?? null;
   children = data.children ?? [];
+  viewerWatching = Boolean(data.viewer_watching);
+  csrfToken = csrf.token;
+  applySetCookies(Astro.response, csrf.setCookies);
   if (category.parent_id !== null || children.length === 0) {
     const list = await listThreads(slug, cookie, { limit, offset, sort });
     threads = list.threads;
@@ -75,7 +84,24 @@ const totalPages = Math.max(1, Math.ceil(total / limit));
           <span aria-current="page">{category.name}</span>
         </nav>
 
-        <h1 class="page-title">{category.name}</h1>
+        <div class="page-title-row">
+          <h1 class="page-title">{category.name}</h1>
+          {user && (
+            <form
+              method="POST"
+              action={`/api/categories/${category.slug}/watch`}
+              class="inline-form"
+              data-live-watch
+            >
+              <CsrfInput token={csrfToken} />
+              <input type="hidden" name="category_id" value={String(category.id)} />
+              <input type="hidden" name="action" value={viewerWatching ? 'unwatch' : 'watch'} />
+              <button type="submit" class:list={['ad-pill', { 'ad-pill--active': viewerWatching }]}>
+                {viewerWatching ? 'Watching' : 'Watch'}
+              </button>
+            </form>
+          )}
+        </div>
         {category.description && <p class="page-sub">{category.description}</p>}
 
         {showSubs ? (

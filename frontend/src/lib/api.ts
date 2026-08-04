@@ -162,10 +162,12 @@ export async function listRootCategories(cookie?: string | null) {
 }
 
 export async function getCategory(slug: string, cookie?: string | null) {
-  return request<{ category: Category; children?: Category[]; parent?: Category | null }>(
-    `/categories/${encodeURIComponent(slug)}`,
-    { cookie },
-  );
+  return request<{
+    category: Category;
+    children?: Category[];
+    parent?: Category | null;
+    viewer_watching?: boolean | null;
+  }>(`/categories/${encodeURIComponent(slug)}`, { cookie });
 }
 
 export async function listChildren(slug: string, cookie?: string | null) {
@@ -219,6 +221,11 @@ export async function listNotifications(
       is_read: boolean;
       created_at: string;
       thread_id?: number | null;
+      post_id?: number | null;
+      category_id?: number | null;
+      category_slug?: string | null;
+      thread_slug?: string | null;
+      thread_title?: string | null;
     }>;
     total: number;
     unread: number;

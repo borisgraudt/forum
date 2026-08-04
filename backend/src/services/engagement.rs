@@ -3,7 +3,7 @@
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
-use crate::models::Notification;
+use crate::models::NotificationView;
 
 pub struct EngagementService;
 
@@ -210,7 +210,7 @@ impl EngagementService {
         limit: i64,
         offset: i64,
         unread_only: bool,
-    ) -> AppResult<(Vec<Notification>, i64)> {
+    ) -> AppResult<(Vec<NotificationView>, i64)> {
         let total = if unread_only {
             sqlx::query_scalar::<_, i64>(
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0",
@@ -227,20 +227,36 @@ impl EngagementService {
 
         let sql = if unread_only {
             r#"
-            SELECT * FROM notifications
-            WHERE user_id = ? AND is_read = 0
-            ORDER BY created_at DESC, id DESC
+            SELECT
+                n.id, n.user_id, n.kind, n.actor_id, n.thread_id, n.post_id,
+                n.category_id, n.body, n.is_read, n.created_at,
+                c.slug AS category_slug,
+                t.slug AS thread_slug,
+                t.title AS thread_title
+            FROM notifications n
+            LEFT JOIN threads t ON t.id = n.thread_id
+            LEFT JOIN categories c ON c.id = COALESCE(n.category_id, t.category_id)
+            WHERE n.user_id = ? AND n.is_read = 0
+            ORDER BY n.created_at DESC, n.id DESC
             LIMIT ? OFFSET ?
             "#
         } else {
             r#"
-            SELECT * FROM notifications
-            WHERE user_id = ?
-            ORDER BY created_at DESC, id DESC
+            SELECT
+                n.id, n.user_id, n.kind, n.actor_id, n.thread_id, n.post_id,
+                n.category_id, n.body, n.is_read, n.created_at,
+                c.slug AS category_slug,
+                t.slug AS thread_slug,
+                t.title AS thread_title
+            FROM notifications n
+            LEFT JOIN threads t ON t.id = n.thread_id
+            LEFT JOIN categories c ON c.id = COALESCE(n.category_id, t.category_id)
+            WHERE n.user_id = ?
+            ORDER BY n.created_at DESC, n.id DESC
             LIMIT ? OFFSET ?
             "#
         };
-        let rows = sqlx::query_as::<_, Notification>(sql)
+        let rows = sqlx::query_as::<_, NotificationView>(sql)
             .bind(user_id)
             .bind(limit)
             .bind(offset)

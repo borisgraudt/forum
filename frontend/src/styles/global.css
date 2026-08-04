@@ -458,6 +458,17 @@ p {
 }
 
 /* —— Topic list (example3 / example4), no stripes —— */
+.page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-title-row .page-title {
+  margin: 0;
+}
+
 .topic-sort {
   display: inline-flex;
   flex-wrap: wrap;

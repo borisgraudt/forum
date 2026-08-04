@@ -6,9 +6,9 @@ use validator::Validate;
 
 use crate::dto::{CategoryListResponse, CategoryResponse, CreateCategoryRequest};
 use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
+use crate::middleware::{AuthUser, OptionalAuthUser};
 use crate::models::User;
-use crate::services::CategoryService;
+use crate::services::{CategoryService, EngagementService};
 use crate::state::AppState;
 use crate::utils::{slugify, validation_error};
 
@@ -30,6 +30,7 @@ async fn list_root_categories(
 
 async fn get_category(
     State(state): State<AppState>,
+    OptionalAuthUser(viewer): OptionalAuthUser,
     Path(slug): Path<String>,
 ) -> AppResult<(StatusCode, Json<CategoryResponse>)> {
     let category = CategoryService::get_by_slug(&state.db, &slug).await?;
@@ -43,12 +44,18 @@ async fn get_category(
     } else {
         None
     };
+    let viewer_watching = if let Some(u) = viewer {
+        Some(EngagementService::is_watching(&state.db, u.id, "category", category.id).await?)
+    } else {
+        None
+    };
     Ok((
         StatusCode::OK,
         Json(CategoryResponse {
             category,
             children,
             parent,
+            viewer_watching,
         }),
     ))
 }
@@ -122,6 +129,7 @@ async fn create_category(
             category,
             children: None,
             parent: None,
+            viewer_watching: None,
         }),
     ))
 }

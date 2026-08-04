@@ -139,6 +139,7 @@ async fn update_category(
             category,
             children: None,
             parent: None,
+            viewer_watching: None,
         }),
     ))
 }

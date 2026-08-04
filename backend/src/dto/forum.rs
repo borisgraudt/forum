@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::models::{
-    AttachmentJson, AuditEntry, Category, Draft, Notification, PostEdit, PostViewJson, Report,
+    AttachmentJson, AuditEntry, Category, Draft, NotificationView, PostEdit, PostViewJson, Report,
     ReportView, ThreadView, UserProfile, UserPublic, UserSanction, UserSanctionView,
 };
 use crate::services::embed::LinkEmbed;
@@ -144,6 +144,8 @@ pub struct CategoryResponse {
     pub children: Option<Vec<Category>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<Category>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewer_watching: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -267,7 +269,7 @@ pub struct SolveThreadRequest {
 
 #[derive(Debug, Serialize)]
 pub struct NotificationListResponse {
-    pub notifications: Vec<Notification>,
+    pub notifications: Vec<NotificationView>,
     pub total: i64,
     pub unread: i64,
     pub limit: i64,

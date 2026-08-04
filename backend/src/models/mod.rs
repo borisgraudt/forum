@@ -14,7 +14,7 @@ mod user;
 
 pub use category::Category;
 pub use draft::Draft;
-pub use engagement::Notification;
+pub use engagement::NotificationView;
 pub use media::{Attachment, AttachmentJson};
 pub use moderation::{
     AuditEntry, Report, ReportView, SanctionKind, UserSanction, UserSanctionView,
